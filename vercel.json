@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/(.*)", "destination": "https://ezn4yk5sghe2q.kimi.page/$1" }
+  ]
+}
