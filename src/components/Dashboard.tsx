@@ -465,7 +465,7 @@ export function Dashboard() {
           
           {/* Transfer Notification Banner */}
           {currentUser && (
-            <TransferNotification theme={theme} currentUser={currentUser} />
+            <TransferNotification theme={theme} />
           )}
 
           {/* Toolbar */}
@@ -907,7 +907,6 @@ export function Dashboard() {
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
           theme={theme}
-          currentUser={currentUser}
           tools={tools}
         />
       )}
