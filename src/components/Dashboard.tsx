@@ -893,15 +893,12 @@ export function Dashboard() {
         <AdminPanel
           open={showAdmin}
           onClose={() => setShowAdmin(false)}
-          theme={theme}
-          currentUserEmail={currentUser?.email}
         />
       )}
 
       <LoginModal
         open={isLoginOpen}
         onClose={() => { setIsLoginOpen(false); setLoginError(null); }}
-        initialError={loginError}
       />
 
       {/* Share Tools Modal */}
