@@ -17,14 +17,6 @@ export interface AppNotification {
 
 const LS_NOTIFICATIONS_KEY = 'user_notifications_fallback';
 
-function getLocalNotifications(): AppNotification[] {
-  try {
-    const raw = localStorage.getItem(LS_NOTIFICATIONS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return [];
-}
-
 export interface SendNotificationParams {
   ownerEmail: string;
   title: string;
