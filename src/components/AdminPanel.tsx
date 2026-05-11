@@ -979,8 +979,8 @@ import { Input } from '@/components/ui/input';
 import { Megaphone, Send, Loader2 } from 'lucide-react';
 import { sendNotificationToProfile } from '@/hooks/useNotifications';
 
-const SUPABASE_URL = 'https://cmfgirvgnexkcomhcosm.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_Dm-ozWvAve1nkgjEDg_QsA_-gldlMxk';
+//const SUPABASE_URL = 'https://cmfgirvgnexkcomhcosm.supabase.co';
+//const SUPABASE_KEY = 'sb_publishable_Dm-ozWvAve1nkgjEDg_QsA_-gldlMxk';
 
 interface GeneralNotificationModalProps {
   open: boolean;
