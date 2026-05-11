@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>registAI - Inteligência Artificial aplicada ao Compliance e Automação</title>
+    <meta name="description" content="registAI - Catálogo inteligente de ferramentas de IA para Compliance e Automação. Belo Horizonte, MG, Brasil." />
+    <meta name="author" content="registAI" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <link rel="canonical" href="https://www.registai.com.br" />
+    <script>
+      (function() {
+        var v = 'v12-' + new Date().toISOString().slice(0,10);
+        var s = localStorage.getItem('_app_v');
+        if (s && s !== v) {
+          localStorage.setItem('_app_v', v);
+          location.reload(true);
+        } else {
+          localStorage.setItem('_app_v', v);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
