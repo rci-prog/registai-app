@@ -252,7 +252,7 @@ export function useTools(): UseToolsReturn {
 
   return {
     tools, allTools, categories, clickData, budget,
-    filters, isLoading, error,
+    subscriptions: [], projects: [], filters, isLoading, error,
     toggleFavorite, saveNotes, saveRating, addTool, editTool, deleteTool,
     addCategory, editCategory, deleteCategory, recordAccess, resetClicks,
     setUserBudget, addSubscription, deleteSubscription, confirmSubscriptionPayment,
