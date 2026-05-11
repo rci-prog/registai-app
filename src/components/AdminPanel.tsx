@@ -523,12 +523,9 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
                   className="flex items-center justify-between p-3 rounded-lg bg-slate-800 border border-slate-700"
                 >
                   <div className="flex items-center gap-3">
-                    <Avatar className="w-8 h-8">
-                      <AvatarImage src={user.avatar} />
-                      <AvatarFallback className="bg-violet-600 text-white text-xs">
-                        {user.name?.charAt(0)?.toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
+                    <div className="h-8 w-8 rounded-full bg-violet-600 flex items-center justify-center text-white text-xs font-bold">
+  {user.name?.charAt(0)?.toUpperCase() || 'U'}
+</div>
                     <div>
                       <div className="text-sm font-medium text-white">{user.name}</div>
                       <div className="text-xs text-slate-400">{user.email}</div>
