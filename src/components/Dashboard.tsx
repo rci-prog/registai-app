@@ -87,7 +87,6 @@ export function Dashboard() {
   const { currentUser, theme, isAdmin, profile, blockMessage } = useAuth();
   
   const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
 
   // Verificar se usuario do cache ainda e valido (profile existe e nao esta bloqueado)
