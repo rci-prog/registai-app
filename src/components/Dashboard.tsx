@@ -882,10 +882,8 @@ export function Dashboard() {
       <ProfileModal
         open={showProfile}
         onClose={() => setShowProfile(false)}
-        profile={profile ? { id: profile.id, email: profile.email, name: profile.name, avatar: profile.avatar, created_at: profile.created_at, username: profile.username } : null}
+        profile={profile}
         theme={theme}
-        onUpdate={updateProfile}
-        onDeleteAccount={deleteAccount}
       />
 
       {/* Admin Panel */}
