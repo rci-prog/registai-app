@@ -102,8 +102,6 @@ export function useTools(): UseToolsReturn {
   const [categories, setCategories] = useState<Category[]>([]);
   const [clickData, setClickData] = useState<ClickData[]>([]);
   const [budget, setBudget] = useState<Budget>({ monthly: 0, yearly: 0 });
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>({ category: '', subcategory: '', search: '', favoritesOnly: false });
