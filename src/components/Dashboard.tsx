@@ -84,7 +84,7 @@ export function Dashboard() {
     refreshTools,
   } = useTools();
   
-  const { currentUser, theme, isAdmin, profile, updateProfile, deleteAccount, blockMessage } = useAuth();
+  const { currentUser, theme, isAdmin, profile, blockMessage } = useAuth();
   
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -882,7 +882,7 @@ export function Dashboard() {
       <ProfileModal
         open={showProfile}
         onClose={() => setShowProfile(false)}
-        profile={profile}
+        profile={profile as any}
         theme={theme}
       />
 
