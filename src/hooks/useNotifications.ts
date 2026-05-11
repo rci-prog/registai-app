@@ -15,8 +15,6 @@ export interface AppNotification {
   user_email?: string;
 }
 
-const LS_NOTIFICATIONS_KEY = 'user_notifications_fallback';
-
 export interface SendNotificationParams {
   ownerEmail: string;
   title: string;
