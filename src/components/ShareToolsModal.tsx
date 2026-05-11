@@ -4,7 +4,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Share2, Send } from 'lucide-react';
 
 interface ShareToolsModalProps {
@@ -53,10 +52,15 @@ export function ShareToolsModal({ isOpen, onClose, theme, currentUser, tools }: 
             <Input value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="usuario@email.com" className={theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : ''} />
           </div>
 
-          <div className="max-h-48 overflow-y-auto space-y-2">
+      <div className="max-h-48 overflow-y-auto space-y-2">
             {tools.map((tool: any) => (
               <label key={tool.id} className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'hover:bg-slate-800' : 'hover:bg-gray-50'}`}>
-                <Checkbox checked={selectedTools.includes(tool.id)} onCheckedChange={() => handleToggleTool(tool.id)} />
+                <input 
+                  type="checkbox" 
+                  checked={selectedTools.includes(tool.id)} 
+                  onChange={() => handleToggleTool(tool.id)} 
+                  className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-600 cursor-pointer"
+                />
                 <span className={`text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}`}>{tool.name}</span>
               </label>
             ))}
