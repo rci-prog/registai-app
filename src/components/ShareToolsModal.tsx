@@ -10,11 +10,10 @@ interface ShareToolsModalProps {
   isOpen: boolean;
   onClose: () => void;
   theme: string;
-  currentUser: any;
   tools: any[];
 }
 
-export function ShareToolsModal({ isOpen, onClose, theme, currentUser, tools }: ShareToolsModalProps) {
+export function ShareToolsModal({ isOpen, onClose, theme, tools }: ShareToolsModalProps) {
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [recipientEmail, setRecipientEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
