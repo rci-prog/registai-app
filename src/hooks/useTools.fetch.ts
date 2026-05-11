@@ -251,7 +251,7 @@ export function useTools(): UseToolsReturn {
   const refreshTools = () => loadTools();
 
   return {
-    tools, allTools, categories, clickData, budget, subscriptions, projects,
+    tools, allTools, categories, clickData, budget,
     filters, isLoading, error,
     toggleFavorite, saveNotes, saveRating, addTool, editTool, deleteTool,
     addCategory, editCategory, deleteCategory, recordAccess, resetClicks,
