@@ -12,7 +12,7 @@ interface SubscriptionManagerProps {
   onConfirmPayment: (id: string) => Promise<{ success: boolean }>;
 }
 
-export function SubscriptionManager({ subscriptions, theme, onAdd, onDelete, onConfirmPayment }: SubscriptionManagerPropsProps) {
+export function SubscriptionManager({ subscriptions, theme, onAdd, onDelete, onConfirmPayment }: SubscriptionManagerProps) {
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
   const [cost, setCost] = useState('');
