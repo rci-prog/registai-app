@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Bell, Check, X, Package } from 'lucide-react';
+import { Bell, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface TransferNotificationProps {
   theme: string;
-  currentUser: any;
 }
 
 interface Transfer {
@@ -15,7 +14,7 @@ interface Transfer {
   created_at: string;
 }
 
-export function TransferNotification({ theme, currentUser }: TransferNotificationProps) {
+export function TransferNotification({ theme }: TransferNotificationProps) {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
