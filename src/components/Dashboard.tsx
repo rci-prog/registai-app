@@ -880,11 +880,13 @@ export function Dashboard() {
 
       {/* Profile Modal */}
       <ProfileModal
-        open={showProfile}
-        onClose={() => setShowProfile(false)}
-        profile={profile as any}
-        theme={theme}
-      />
+  open={showProfile}
+  onClose={() => setShowProfile(false)}
+  profile={profile as any}
+  theme={theme}
+  onUpdate={async () => ({ success: true })}
+  onDeleteAccount={async () => ({ success: true })}
+/>  
 
       {/* Admin Panel */}
       {isAdmin && (
