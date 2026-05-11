@@ -361,7 +361,7 @@ export function Dashboard() {
           </Button>
         </div>
         <LoginModal
-          isOpen={isLoginOpen}
+          open={isLoginOpen}
           onClose={() => { setIsLoginOpen(false); setLoginError(null); }}
           initialError={loginError}
         />
@@ -900,7 +900,7 @@ export function Dashboard() {
       )}
 
       <LoginModal
-        isOpen={isLoginOpen}
+        open={isLoginOpen}
         onClose={() => { setIsLoginOpen(false); setLoginError(null); }}
         initialError={loginError}
       />
@@ -910,7 +910,6 @@ export function Dashboard() {
         <ShareToolsModal
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
-          theme={theme}
           currentUser={currentUser}
           tools={tools}
         />
