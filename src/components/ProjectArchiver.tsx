@@ -1,4 +1,4 @@
-import { FolderOpen, Plus, Trash2, FileText } from 'lucide-react';
+import { FolderOpen, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ interface ProjectArchiverProps {
   onDelete: (id: string) => Promise<{ success: boolean }>;
 }
 
-export function ProjectArchiver({ projects, tools, theme, onAdd, onDelete }: ProjectArchiverProps) {
+export function ProjectArchiver({ projects, theme, onAdd, onDelete }: ProjectArchiverProps) {
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
