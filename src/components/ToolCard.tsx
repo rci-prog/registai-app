@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'; // Adicionado useEffect para sincronismo
 import {
-  Heart, ExternalLink, Edit, Trash2, Star, FileText, MoreVertical, AlertTriangle
+  Heart, ExternalLink, Edit, Trash2, Star, FileText, MoreVertical
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
