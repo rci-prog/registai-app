@@ -1171,6 +1171,7 @@ export function useTools() {
     tools: filteredTools,
     allTools: tools,
     categories,
+    clickData,
     userProjects: projects,
     userBudget: budget,
     userSubscriptions: subscriptions,
