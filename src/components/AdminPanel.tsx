@@ -48,6 +48,13 @@ interface DailyClick {
   count: number;
 }
 
+interface AdminPanelProps {
+  open: boolean;
+  onClose: () => void;
+  theme?: 'light' | 'dark';
+  currentUserEmail?: string;
+}
+
 // ============================================================
 // HELPERS
 // ============================================================
@@ -67,9 +74,8 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeout = 100
 // ============================================================
 // COMPONENT
 // ============================================================
-export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function AdminPanel({ open, onClose, theme, currentUserEmail }: AdminPanelProps) {
   const { currentUser } = useAuth();
-  const currentUserEmail = currentUser?.email || '';
 
   // Users
   const [localUsers, setLocalUsers] = useState<AdminUser[]>([]);
