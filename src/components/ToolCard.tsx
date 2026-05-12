@@ -24,7 +24,7 @@ interface Tool {
   id: string;
   name: string;
   description: string | null;
-  category: string;
+  category: any; // Alterado para any para suportar string ou objeto durante a migração
   subcategory: string | null;
   url: string;
   image_url: string | null;
@@ -56,7 +56,13 @@ export function ToolCard({
   tool, isLoggedIn, isAdmin, theme, categories,
   onToggleFavorite, onEdit, onDelete, onSaveNotes, onRate, onAccess,
 }: ToolCardProps) {
-  // --- ESTADOS (Declarados apenas uma vez) ---
+  
+  // --- BLINDAGEM DE CATEGORIA ---
+  // Normaliza para string independente do que venha do banco
+  const toolCategoryName = typeof tool?.category === 'string' 
+    ? tool.category 
+    : (tool?.category?.name || 'Geral');
+
   const [showNotes, setShowNotes] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -66,11 +72,10 @@ export function ToolCard({
     name: tool?.name || '', 
     description: tool?.description || '',
     url: tool?.url || '', 
-    category: tool?.category || 'Geral', 
+    category: toolCategoryName, 
     image_url: tool?.image_url || '',
   });
 
-  // --- HANDLERS ---
   const handleSaveNotes = () => { onSaveNotes?.(tool?.id || '', notes); setShowNotes(false); };
   const handleEdit = () => { if (tool) onEdit?.({ ...tool, ...editData }); setShowEdit(false); };
   const handleDelete = () => { onDelete?.(tool?.id || ''); setShowDeleteConfirm(false); };
@@ -114,8 +119,8 @@ export function ToolCard({
                   <h3 className={`font-semibold text-base truncate ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                     {tool?.name || 'Carregando...'}
                   </h3>
-                  <span className={`text-xs px-2 py-0.5 rounded-full border ${getCategoryColor(tool?.category || 'Geral')}`}>
-                    {tool?.category || 'Geral'}
+                  <span className={`text-xs px-2 py-0.5 rounded-full border ${getCategoryColor(toolCategoryName)}`}>
+                    {toolCategoryName}
                   </span>
                 </div>
                 {isAdmin && (
@@ -172,7 +177,6 @@ export function ToolCard({
         </div>
       </div>
 
-      {/* Dialogs... */}
       <Dialog open={showNotes} onOpenChange={setShowNotes}>
         <DialogContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}>
           <DialogHeader>
