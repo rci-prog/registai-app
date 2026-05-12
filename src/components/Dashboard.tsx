@@ -216,7 +216,7 @@ export function Dashboard() {
       counts[cat.name] = 0;
     });
     // Contar apenas ferramentas do usuario logado
-    tools.forEach((tool: any) => {
+    allTools.forEach((tool: any) => {
       const toolCatLower = tool.category.toLowerCase();
       // Encontrar a categoria correspondente (case-insensitive)
       const matchingCat = categories.find((cat: any) => 
@@ -228,7 +228,7 @@ export function Dashboard() {
       }
     });
     return counts;
-  }, [tools, categories]);
+  }, [allTools, categories]);
 
   const handleAddTool = async () => {
     console.log('[Dashboard] handleAddTool chamado:', newToolData);
