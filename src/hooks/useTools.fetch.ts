@@ -1098,7 +1098,7 @@ export function useTools() {
     // 2. Filtro por Categoria (com blindagem de string)
     if (filters.category && filters.category !== 'all') {
       result = result.filter(tool => {
-        const toolCat = (typeof tool.category === 'string' ? tool.category : (tool.category?.name || 'Geral')).toLowerCase();
+        const toolCat = (typeof tool.category === 'string' ? tool.category : ((tool.category as any)?.name || 'Geral')).toLowerCase();
         const filterCat = (filters.category || '').toLowerCase();
         return toolCat === filterCat;
       });
