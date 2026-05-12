@@ -90,7 +90,7 @@ export function Dashboard() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
 
-  const [blockMessage, setBlockMessage] = useState<string | null>(null);
+  const [blockMessage] = useState<string | null>(null);
   // Verificar se usuario do cache ainda e valido (profile existe e nao esta bloqueado)
   // Usa fetch direto com API key para BYPASS RLS — le valor real do is_blocked
   const SUPABASE_URL = 'https://cmfgirvgnexkcomhcosm.supabase.co';
