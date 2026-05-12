@@ -56,21 +56,28 @@ export function ToolCard({
   tool, isLoggedIn, isAdmin, theme, categories,
   onToggleFavorite, onEdit, onDelete, onSaveNotes, onRate, onAccess,
 }: ToolCardProps) {
+  // --- ESTADOS (Declarados apenas uma vez) ---
   const [showNotes, setShowNotes] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [notes, setNotes] = useState(tool.notes || '');
+  const [notes, setNotes] = useState(tool?.notes || '');
   const [editData, setEditData] = useState({
-    id: tool.id, name: tool.name, description: tool.description || '',
-    url: tool.url, category: tool.category, image_url: tool.image_url || '',
+    id: tool?.id || '', 
+    name: tool?.name || '', 
+    description: tool?.description || '',
+    url: tool?.url || '', 
+    category: tool?.category || '', 
+    image_url: tool?.image_url || '',
   });
 
-  const handleSaveNotes = () => { onSaveNotes?.(tool.id, notes); setShowNotes(false); };
-  const handleEdit = () => { onEdit?.({ ...tool, ...editData }); setShowEdit(false); };
-  const handleDelete = () => { onDelete?.(tool.id); setShowDeleteConfirm(false); };
-  const handleRate = (star: number) => { onRate?.(tool.id, (tool.rating || 0) === star ? 0 : star); };
+  // --- HANDLERS ---
+  const handleSaveNotes = () => { onSaveNotes?.(tool?.id || '', notes); setShowNotes(false); };
+  const handleEdit = () => { if (tool) onEdit?.({ ...tool, ...editData }); setShowEdit(false); };
+  const handleDelete = () => { onDelete?.(tool?.id || ''); setShowDeleteConfirm(false); };
+  const handleRate = (star: number) => { onRate?.(tool?.id || '', (tool?.rating || 0) === star ? 0 : star); };
 
   const getCategoryColor = (category: string) => {
+    if (!category) return theme === 'dark' ? 'bg-slate-800 text-slate-400' : 'bg-gray-100 text-gray-600';
     const colors: Record<string, string> = {
       'Chatbots': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
       'Imagens': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
@@ -92,10 +99,10 @@ export function ToolCard({
         <div className="p-4">
           <div className="flex items-start gap-3">
             <div className="relative flex-shrink-0">
-              <img src={tool.image_url || `https://www.google.com/s2/favicons?domain=${tool.url}&sz=128`}
-                alt={tool.name} className="w-12 h-12 rounded-lg object-cover"
+              <img src={tool?.image_url || `https://www.google.com/s2/favicons?domain=${tool?.url}&sz=128`}
+                alt={tool?.name} className="w-12 h-12 rounded-lg object-cover"
                 onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/48?text=AI'; }} />
-              {tool.isFavorite && (
+              {tool?.isFavorite && (
                 <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
                   <Heart className="w-3 h-3 text-white fill-current" />
                 </div>
@@ -105,10 +112,10 @@ export function ToolCard({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <h3 className={`font-semibold text-base truncate ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                    {tool.name}
+                    {tool?.name || 'Carregando...'}
                   </h3>
-                  <span className={`text-xs px-2 py-0.5 rounded-full border ${getCategoryColor(tool.category)}`}>
-                    {tool.category}
+                  <span className={`text-xs px-2 py-0.5 rounded-full border ${getCategoryColor(tool?.category || '')}`}>
+                    {tool?.category || 'Geral'}
                   </span>
                 </div>
                 {isAdmin && (
@@ -130,7 +137,7 @@ export function ToolCard({
                 )}
               </div>
               <p className={`text-sm mt-2 line-clamp-2 ${theme === 'dark' ? 'text-slate-400' : 'text-gray-600'}`}>
-                {tool.description || 'Sem descricao'}
+                {tool?.description || 'Sem descrição'}
               </p>
             </div>
           </div>
@@ -138,10 +145,10 @@ export function ToolCard({
             <div className="flex items-center gap-1 mt-3">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button key={star} onClick={() => handleRate(star)} className="p-0.5 transition-colors hover:scale-110">
-                  <Star className={`w-4 h-4 ${(tool.rating || 0) >= star ? 'text-yellow-400 fill-current' : theme === 'dark' ? 'text-slate-600' : 'text-gray-300'}`} />
+                  <Star className={`w-4 h-4 ${(tool?.rating || 0) >= star ? 'text-yellow-400 fill-current' : theme === 'dark' ? 'text-slate-600' : 'text-gray-300'}`} />
                 </button>
               ))}
-              {tool.notes && (
+              {tool?.notes && (
                 <span className={`ml-2 text-xs flex items-center gap-1 ${theme === 'dark' ? 'text-violet-400' : 'text-violet-600'}`}>
                   <FileText className="w-3 h-3" /> Notas
                 </span>
@@ -151,25 +158,25 @@ export function ToolCard({
         </div>
         <div className={`px-4 py-3 border-t flex items-center justify-between ${theme === 'dark' ? 'border-slate-800' : 'border-gray-100'}`}>
           <div className="flex items-center gap-2">
-            <button onClick={() => onToggleFavorite?.(tool.id)} className={`p-2 rounded-lg transition-colors ${
-              tool.isFavorite ? 'text-red-500 bg-red-500/10' : theme === 'dark' ? 'text-slate-500 hover:text-red-400 hover:bg-red-500/10' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-            }`} title="Favoritar"><Heart className={`w-4 h-4 ${tool.isFavorite ? 'fill-current' : ''}`} /></button>
+            <button onClick={() => onToggleFavorite?.(tool?.id || '')} className={`p-2 rounded-lg transition-colors ${
+              tool?.isFavorite ? 'text-red-500 bg-red-500/10' : theme === 'dark' ? 'text-slate-500 hover:text-red-400 hover:bg-red-500/10' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+            }`} title="Favoritar"><Heart className={`w-4 h-4 ${tool?.isFavorite ? 'fill-current' : ''}`} /></button>
             <button onClick={() => setShowNotes(true)} className={`p-2 rounded-lg transition-colors ${
-              tool.notes ? 'text-violet-500 bg-violet-500/10' : theme === 'dark' ? 'text-slate-500 hover:text-violet-400 hover:bg-violet-500/10' : 'text-gray-400 hover:text-violet-500 hover:bg-violet-50'
+              tool?.notes ? 'text-violet-500 bg-violet-500/10' : theme === 'dark' ? 'text-slate-500 hover:text-violet-400 hover:bg-violet-500/10' : 'text-gray-400 hover:text-violet-500 hover:bg-violet-50'
             }`} title="Notas"><FileText className="w-4 h-4" /></button>
           </div>
-          <a href={tool.url} target="_blank" rel="noopener noreferrer" onClick={() => onAccess?.(tool.id)}
+          <a href={tool?.url} target="_blank" rel="noopener noreferrer" onClick={() => onAccess?.(tool?.id || '')}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-violet-600 hover:bg-violet-700 text-white transition-colors">
             Acessar <ExternalLink className="w-4 h-4" />
           </a>
         </div>
       </div>
 
-      {/* Notes Dialog */}
+      {/* Dialogs... */}
       <Dialog open={showNotes} onOpenChange={setShowNotes}>
         <DialogContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}>
           <DialogHeader>
-            <DialogTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>Notas - {tool.name}</DialogTitle>
+            <DialogTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>Notas - {tool?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-4">
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Adicione suas notas..."
@@ -182,7 +189,6 @@ export function ToolCard({
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
         <DialogContent className={`max-w-lg ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}`}>
           <DialogHeader>
@@ -192,7 +198,7 @@ export function ToolCard({
           <div className="space-y-4 pt-4">
             <div><Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Nome</Label>
               <Input value={editData.name} onChange={(e) => setEditData({ ...editData, name: e.target.value })} className={theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : ''} /></div>
-            <div><Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Descricao</Label>
+            <div><Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Descrição</Label>
               <Textarea value={editData.description} onChange={(e) => setEditData({ ...editData, description: e.target.value })} className={theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : ''} /></div>
             <div><Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>URL</Label>
               <Input value={editData.url} onChange={(e) => setEditData({ ...editData, url: e.target.value })} className={theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : ''} /></div>
@@ -213,15 +219,14 @@ export function ToolCard({
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}>
           <AlertDialogHeader>
             <AlertDialogTitle className={`flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              <AlertTriangle className="w-5 h-5 text-red-500" /> Confirmar exclusao
+              <AlertTriangle className="w-5 h-5 text-red-500" /> Confirmar exclusão
             </AlertDialogTitle>
             <AlertDialogDescription className={theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}>
-              Tem certeza que deseja excluir <strong>{tool.name}</strong>? Esta acao nao pode ser desfeita.
+              Tem certeza que deseja excluir <strong>{tool?.name}</strong>? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
