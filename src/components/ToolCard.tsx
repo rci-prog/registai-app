@@ -66,7 +66,7 @@ export function ToolCard({
     name: tool?.name || '', 
     description: tool?.description || '',
     url: tool?.url || '', 
-    category: tool?.category || '', 
+    category: tool?.category || 'Geral', 
     image_url: tool?.image_url || '',
   });
 
@@ -114,7 +114,7 @@ export function ToolCard({
                   <h3 className={`font-semibold text-base truncate ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                     {tool?.name || 'Carregando...'}
                   </h3>
-                  <span className={`text-xs px-2 py-0.5 rounded-full border ${getCategoryColor(tool?.category || '')}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full border ${getCategoryColor(tool?.category || 'Geral')}`}>
                     {tool?.category || 'Geral'}
                   </span>
                 </div>
