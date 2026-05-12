@@ -84,7 +84,7 @@ export function Dashboard() {
     refreshTools,
   } = useTools();
   
-  const { currentUser, theme, isAdmin, profile, updateProfile, deleteAccount, blockMessage } = useAuth();
+  const { currentUser, theme, isAdmin, profile } = useAuth();
   
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -685,7 +685,7 @@ export function Dashboard() {
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : ''}>
-                  {categories.map((cat) => (
+                  {categories.map((cat: any) => (
                     <SelectItem key={cat.id} value={cat.id}>
                       {cat.name}
                     </SelectItem>
@@ -753,7 +753,7 @@ export function Dashboard() {
             {/* Categories List */}
             <div className="space-y-2 max-h-64 overflow-y-auto">
               <Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Categorias Existentes</Label>
-              {categories.map((cat) => (
+              {categories.map((cat: any) => (
                 <div 
                   key={cat.id} 
                   className={`flex items-center justify-between p-3 rounded-lg ${theme === 'dark' ? 'bg-slate-800' : 'bg-gray-50'}`}
@@ -898,7 +898,7 @@ export function Dashboard() {
         onClose={() => setShowProfile(false)}
         profile={profile as any}
         theme={theme}
-        onUpdate={async (updates) => {
+        onUpdate={async () => {
           return { success: true }
         }}
         onDeleteAccount={async () => {
