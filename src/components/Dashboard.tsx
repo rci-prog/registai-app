@@ -84,10 +84,10 @@ export function Dashboard() {
     refreshTools,
   } = useTools();
   
-  const { currentUser, theme, isAdmin, profile, blockMessage } = useAuth();
+  const { currentUser, theme, isAdmin, profile, updateProfile, deleteAccount, blockMessage } = useAuth();
   
   const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const setLoginError = (msg: string | null) => msg && console.error("Login Error:", msg);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
 
   // Verificar se usuario do cache ainda e valido (profile existe e nao esta bloqueado)
@@ -122,13 +122,13 @@ export function Dashboard() {
         const rawBlocked = profileData?.is_blocked;
         const isBlocked = rawBlocked === true || rawBlocked === 'true' || rawBlocked === 1 || rawBlocked === 't';
         if (isBlocked) {
-          console.log('[Dashboard] [verifyUser] Usuario BLOQUEADO detectado, fazendo signOut:', currentUser.email);
+          console.log('[Dashboard] [verifyUser] 🚫 Usuario BLOQUEADO detectado, fazendo signOut:', currentUser.email);
           await logout();
           setLoginError('Sua conta foi suspensa. Entre em contato com o suporte.');
           setIsLoginOpen(true);
           return;
         }
-        console.log('[Dashboard] [verifyUser] Usuario OK:', currentUser.email);
+        console.log('[Dashboard] [verifyUser] ✅ Usuario OK:', currentUser.email);
       } catch (e: any) {
         console.error('[Dashboard] [verifyUser] Erro:', e.message);
       }
@@ -177,13 +177,13 @@ export function Dashboard() {
     return () => window.removeEventListener('tools-changed', handleToolsChanged);
   }, [refreshTools]);
 
-  // Detectar erro de auth (bloqueio/deleted) apos redirect do Google — VERIFICA NA MONTAGEM
+  // Detectar erro de auth (bloqueio/deleted) após redirect do Google — VERIFICA NA MONTAGEM
   useEffect(() => {
     const raw = localStorage.getItem('auth_error');
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        // So usa se for recente (< 30 segundos)
+        // Só usa se for recente (< 30 segundos)
         if (Date.now() - parsed.ts < 30000) {
           setLoginError(parsed.msg);
           setIsLoginOpen(true);
@@ -207,7 +207,8 @@ export function Dashboard() {
   });
 
   // Calcular contagem por categoria (case-insensitive, mapeia por id e por nome)
-  // Usa 'tools' (apenas do usuario) em vez de 'allTools' (todas do sistema)
+  // Usa 'allTools' (todas as ferramentas disponiveis no Supabase)
+  // CORRECAO: (tool.category || 'Geral') para evitar undefined
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     // Inicializar com 0 para todas as categorias
@@ -215,9 +216,9 @@ export function Dashboard() {
       counts[cat.id] = 0;
       counts[cat.name] = 0;
     });
-    // Contar apenas ferramentas do usuario logado
+    // Contar TODAS as ferramentas disponiveis (nao so as filtradas)
     allTools.forEach((tool: any) => {
-      const toolCatLower = tool.category.toLowerCase();
+      const toolCatLower = (tool.category || 'Geral').toLowerCase();
       // Encontrar a categoria correspondente (case-insensitive)
       const matchingCat = categories.find((cat: any) => 
         cat.id.toLowerCase() === toolCatLower || 
@@ -250,7 +251,7 @@ export function Dashboard() {
       
       setNewToolData({
         name: name,
-        description: `Ferramenta de IA acessivel em ${url.hostname}`,
+        description: `Ferramenta de IA acessível em ${url.hostname}`,
         url: autoGenUrl,
         category: categories[0]?.id || 'Chatbots',
         image_url: `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=128`,
@@ -258,7 +259,7 @@ export function Dashboard() {
       // Mostrar aviso sobre campos que precisam ser personalizados
       setShowScrapeWarning(true);
     } catch {
-      // URL invalida
+      // URL inválida
     }
   };
 
@@ -308,7 +309,7 @@ export function Dashboard() {
   };
 
   // ======= PROTECAO DE ROTA =======
-  // Se nao estiver autenticado, mostra APENAS a tela de login
+  // Se não estiver autenticado, mostra APENAS a tela de login
   if (!currentUser) {
     // ============================================================
     // DETECTAR REDIRECT DO OAUTH: se URL tem token, estamos em
@@ -341,10 +342,10 @@ export function Dashboard() {
               registAI
             </h1>
             <p className={`mt-2 text-base ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>
-              Catalogo Inteligente de IA
+              Catálogo Inteligente de IA
             </p>
             <p className={`mt-4 text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-gray-400'}`}>
-              Faca login para acessar suas ferramentas e o assistente Regis
+              Faça login para acessar suas ferramentas e o assistente Regis
             </p>
           </div>
           {blockMessage && (
@@ -363,6 +364,7 @@ export function Dashboard() {
         <LoginModal
           open={isLoginOpen}
           onClose={() => { setIsLoginOpen(false); setLoginError(null); }}
+          initialError={loginError}
         />
       </div>
     );
@@ -376,7 +378,7 @@ export function Dashboard() {
       <NewsCarousel theme={theme} />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
+        {/* Sidebar - w-80 fixo + flex-shrink-0 para nunca colapsar */}
         <div className="w-80 flex flex-col h-full overflow-y-auto flex-shrink-0">
           <SidebarFilters
             categories={categories}
@@ -465,9 +467,19 @@ export function Dashboard() {
           
           {/* Transfer Notification Banner */}
           {currentUser && (
-            <TransferNotification theme={theme} />
+            <TransferNotification theme={theme} currentUser={currentUser} />
           )}
 
+          {/* CORRECAO 3: Loading Guard — impede renderizacao prematura */}
+          {isLoading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-12 h-12 border-4 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>Carregando ferramentas...</p>
+              </div>
+            </div>
+          ) : (
+            <>
           {/* Toolbar */}
           <div className={`flex items-center justify-between px-6 py-4 border-b ${theme === 'dark' ? 'border-slate-800' : 'border-gray-200'}`}>
             <div className="flex items-center gap-4">
@@ -584,6 +596,8 @@ export function Dashboard() {
               </div>
             )}
           </div>
+          </>
+          )}
         </main>
       </div>
 
@@ -595,7 +609,7 @@ export function Dashboard() {
               Nova Ferramenta
             </DialogTitle>
             <DialogDescription className={theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}>
-              Adicione uma nova ferramenta ao catalogo.
+              Adicione uma nova ferramenta ao catálogo.
             </DialogDescription>
           </DialogHeader>
           
@@ -625,9 +639,9 @@ export function Dashboard() {
             }`}>
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-xs font-semibold">Atencao</p>
+                <p className="text-xs font-semibold">Atenção</p>
                 <p className="text-[11px] mt-0.5">
-                  Ao selecionar a opcao de Puxar dados via URL os campos sao preenchidos automaticamente, porem, nos campos de <strong>Descricao</strong> e <strong>Categoria</strong> e recomendado alterar a descricao e selecionar a categoria desejada.
+                  Ao selecionar a opção de Puxar dados via URL os campos são preenchidos automaticamente, porém, nos campos de <strong>Descrição</strong> e <strong>Categoria</strong> é recomendado alterar a descrição e selecionar a categoria desejada.
                 </p>
               </div>
             </div>
@@ -644,11 +658,11 @@ export function Dashboard() {
               />
             </div>
             <div>
-              <Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Descricao</Label>
+              <Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Descrição</Label>
               <Textarea
                 value={newToolData.description}
                 onChange={(e) => setNewToolData({ ...newToolData, description: e.target.value })}
-                placeholder="Descricao da ferramenta"
+                placeholder="Descrição da ferramenta"
                 className={theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : ''}
               />
             </div>
@@ -671,7 +685,7 @@ export function Dashboard() {
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : ''}>
-                  {categories.map((cat: any) => (
+                  {categories.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id}>
                       {cat.name}
                     </SelectItem>
@@ -739,7 +753,7 @@ export function Dashboard() {
             {/* Categories List */}
             <div className="space-y-2 max-h-64 overflow-y-auto">
               <Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Categorias Existentes</Label>
-              {categories.map((cat: any) => (
+              {categories.map((cat) => (
                 <div 
                   key={cat.id} 
                   className={`flex items-center justify-between p-3 rounded-lg ${theme === 'dark' ? 'bg-slate-800' : 'bg-gray-50'}`}
@@ -815,10 +829,10 @@ export function Dashboard() {
         <AlertDialogContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}>
           <AlertDialogHeader>
             <AlertDialogTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-              Confirmar exclusao
+              Confirmar exclusão
             </AlertDialogTitle>
             <AlertDialogDescription className={theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}>
-              Tem certeza que deseja excluir esta categoria? As ferramentas associadas nao serao excluidas, mas ficarao sem categoria.
+              Tem certeza que deseja excluir esta categoria? As ferramentas associadas não serão excluídas, mas ficarão sem categoria.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -841,7 +855,7 @@ export function Dashboard() {
         <DialogContent className={`max-w-sm ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}`}>
           <DialogHeader>
             <DialogTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-              Definir Orcamento
+              Definir Orçamento
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 pt-2">
@@ -880,25 +894,28 @@ export function Dashboard() {
 
       {/* Profile Modal */}
       <ProfileModal
-  open={showProfile}
-  onClose={() => setShowProfile(false)}
-  profile={profile as any}
-  theme={theme}
-  onUpdate={async () => ({ success: true })}
-  onDeleteAccount={async () => ({ success: true })}
-/>  
+        open={showProfile}
+        onClose={() => setShowProfile(false)}
+        profile={profile ? { id: profile.id, email: profile.email, name: profile.name, avatar: profile.avatar, created_at: profile.created_at, username: profile.username } : null}
+        theme={theme}
+        onUpdate={updateProfile}
+        onDeleteAccount={deleteAccount}
+      />
 
       {/* Admin Panel */}
       {isAdmin && (
         <AdminPanel
           open={showAdmin}
           onClose={() => setShowAdmin(false)}
+          theme={theme}
+          currentUserEmail={currentUser?.email}
         />
       )}
 
       <LoginModal
         open={isLoginOpen}
         onClose={() => { setIsLoginOpen(false); setLoginError(null); }}
+        initialError={loginError}
       />
 
       {/* Share Tools Modal */}
@@ -907,13 +924,15 @@ export function Dashboard() {
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
           theme={theme}
+          currentUser={currentUser}
           tools={tools}
         />
       )}
 
       {/* Regis - Assistente de IA */}
+      {/* CORRECAO 2: category fallback 'Geral' para evitar undefined */}
       <RegisChat
-        tools={allTools.map((t: any) => ({ id: t.id, name: t.name, description: t.description, category: t.category }))}
+        tools={allTools.map((t: any) => ({ id: t.id, name: t.name, description: t.description, category: t.category || 'Geral' }))}
         theme={theme}
         userEmail={currentUser?.email}
       />
