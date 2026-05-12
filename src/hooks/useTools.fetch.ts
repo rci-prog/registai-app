@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const defaultCategories: any[] = [];
@@ -1134,8 +1134,8 @@ export function useTools() {
     deleteProject,
     setCategory: ((cat: string | null) => setFilters((prev: any) => ({ ...prev, category: cat || "" }))) as any,
     setSearch: ((q: string) => setFilters((prev: any) => ({ ...prev, search: q || "" }))) as any,
-    setFavoritesOnly: (v: boolean) => setFilters((prev: any) => ({ ...prev, favoritesOnly: v })),
-    clearFilters: () => setFilters({ category: "", subcategory: "", search: "", favoritesOnly: false }),
+    setFavoritesOnly: ((v: boolean) => setFilters((prev: any) => ({ ...prev, favoritesOnly: v }))) as any,
+    clearFilters: (() => setFilters({ category: "", subcategory: "", search: "", favoritesOnly: false })) as any,
     clearError,
     refreshTools: () => fetchAllData(),
   };
