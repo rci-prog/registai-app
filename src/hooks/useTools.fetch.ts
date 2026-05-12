@@ -1098,7 +1098,7 @@ export function useTools() {
 
     // 4. Mapeamento final com trava de segurança absoluta (DENTRO do mesmo useMemo)
     return result.map((tool: any) => {
-      if (!tool || !tool.id) return null;
+      if (!tool || !tool.id) return { id: 'temp', name: '', category: 'Geral' };
       const userData: any = userToolsData?.get?.(tool.id) || {};
       
       return {
