@@ -671,7 +671,7 @@ export function Dashboard() {
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : ''}>
-                  {categories.map((cat) => (
+                  {categories.map((cat: any) => (
                     <SelectItem key={cat.id} value={cat.id}>
                       {cat.name}
                     </SelectItem>
@@ -739,7 +739,7 @@ export function Dashboard() {
             {/* Categories List */}
             <div className="space-y-2 max-h-64 overflow-y-auto">
               <Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Categorias Existentes</Label>
-              {categories.map((cat) => (
+              {categories.map((cat: any) => (
                 <div 
                   key={cat.id} 
                   className={`flex items-center justify-between p-3 rounded-lg ${theme === 'dark' ? 'bg-slate-800' : 'bg-gray-50'}`}
