@@ -1072,17 +1072,32 @@ export function useTools() {
   const filteredTools = useMemo(() => {
     console.log('[useTools] filteredTools recalculando...', filters);
 
-    // 1. Filtro inicial com blindagem contra nulos
-    let result = tools.filter((tool: any) => {
+    // 1. Filtro inicial com blindagem pesada
+    let result = (tools || []).filter((tool: any) => {
       if (!tool || !tool.id) return false;
       return true;
     });
 
-    // 2. Filtro por Categoria (Com fallback seguro)
-    if (filters.category) {
+    // 2. Filtro por Categoria (Com tratamento para nulos e case-insensitive)
+    if (filters.category && filters.category !== 'all') {
+      result = result.filter(tool => {
+        const toolCat = (tool.category || 'Geral').toLowerCase();
+        const filterCat = (filters.category || '').toLowerCase();
+        return toolCat === filterCat;
+      });
+    }
+
+    // 3. Filtro por busca (Search)
+    if (filters.search) {
+      const query = filters.search.toLowerCase();
       result = result.filter(tool => 
-        (tool.category || 'Geral').toLowerCase() === filters.category?.toLowerCase()
+        (tool.name || '').toLowerCase().includes(query) ||
+        (tool.description || '').toLowerCase().includes(query)
       );
+    }
+
+    return result;
+  }, [tools, filters]);
     }
 
     // 3. Filtro por Busca
