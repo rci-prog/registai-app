@@ -15,7 +15,7 @@ interface Transfer {
   created_at: string;
 }
 
-export function TransferNotification({ theme, currentUser }: TransferNotificationProps) {
+export function TransferNotification({ theme }: TransferNotificationProps) {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
