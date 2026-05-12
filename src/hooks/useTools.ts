@@ -10,16 +10,27 @@ export function useTools(userId?: string) {
 
   const fetchTools = useCallback(async () => {
     setLoading(true);
-    // Buscamos todas as colunas da tabela tools para garantir compatibilidade
     const { data, error } = await supabase.from('tools').select('*').order('name');
     
     if (!error && data) {
-      // NORMALIZAÇÃO: Garante que 'category' seja sempre uma string válida, evitando crash no frontend
-      const normalizedTools = data.map((t: any) => ({
-        ...t,
-        // Prioridade: category_id (novo FK texto) -> category (coluna antiga texto) -> 'Geral' (fallback)
-        category: t.category_id || t.category || 'Geral',
-      }));
+      // 2ª CORREÇÃO: NORMALIZAÇÃO AGRESSIVA
+      // Garante que 'category' seja sempre uma STRING, mesmo que venha objeto do banco
+      const normalizedTools = data.map((t: any) => {
+        let finalCategory = 'Geral';
+        
+        if (typeof t.category === 'string' && t.category.length > 0) {
+          finalCategory = t.category;
+        } else if (t.category_id && typeof t.category_id === 'string') {
+          finalCategory = t.category_id;
+        } else if (t.category && typeof t.category === 'object') {
+          finalCategory = t.category.name || 'Geral';
+        }
+
+        return {
+          ...t,
+          category: finalCategory,
+        };
+      });
       setTools(normalizedTools);
     }
     setLoading(false);
@@ -31,30 +42,43 @@ export function useTools(userId?: string) {
   }, []);
 
   const fetchUserTools = useCallback(async (uid: string) => {
-    // PONTO CRÍTICO: Simplificado para evitar falhas de join caso a FK ainda esteja em migração
     const { data, error } = await supabase
       .from('user_tools')
       .select('*, tool:tools(*)')
       .eq('user_id', uid);
     
     if (!error && data) {
-      // Blindagem adicional: normaliza a categoria dentro do objeto da ferramenta vinculada
       const validUserTools = data
         .filter(ut => ut.tool !== null)
-        .map((ut: any) => ({
-          ...ut,
-          tool: {
-            ...ut.tool,
-            category: ut.tool.category_id || ut.tool.category || 'Geral'
+        .map((ut: any) => {
+          // Repete a blindagem para as ferramentas do usuário
+          let toolCat = 'Geral';
+          const t = ut.tool;
+
+          if (typeof t.category === 'string' && t.category.length > 0) {
+            toolCat = t.category;
+          } else if (t.category_id && typeof t.category_id === 'string') {
+            toolCat = t.category_id;
+          } else if (t.category && typeof t.category === 'object') {
+            toolCat = t.category.name || 'Geral';
           }
-        }));
+
+          return {
+            ...ut,
+            tool: {
+              ...t,
+              category: toolCat
+            }
+          };
+        });
       setUserTools(validUserTools);
     }
   }, []);
 
+  // Ajuste no addTool para garantir que não enviamos objetos
   const addTool = useCallback(async (tool: Omit<Tool, 'id'>) => {
     const { data, error } = await supabase.from('tools').insert(tool).select().single();
-    if (!error) fetchTools(); // Atualiza a lista local
+    if (!error) fetchTools(); 
     return { data, error };
   }, [fetchTools]);
 
@@ -64,7 +88,7 @@ export function useTools(userId?: string) {
       .insert({ user_id: uid, tool_id: toolId })
       .select()
       .single();
-    if (!error) fetchUserTools(uid); // Atualiza a lista do usuário
+    if (!error) fetchUserTools(uid);
     return { data, error };
   }, [fetchUserTools]);
 
