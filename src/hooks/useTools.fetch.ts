@@ -1,7 +1,12 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { supabase as getAuth } from '@/lib/supabase';
-import type { FilterState } from '@/types';
+import { supabase } from '@/lib/supabase';
 import { categories as defaultCategories } from '@/data/tools';
+export interface FilterState {
+  category: string | null;
+  subcategory: string | null;
+  search: string;
+  favoritesOnly: boolean;
+}
 
 // ============================================================
 // CONFIG
@@ -224,9 +229,20 @@ export function useTools() {
     favoritesOnly: false,
   });
 
-  const currentUser = getAuth();
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // Estados de budget e subscriptions
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUser(data.user);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUser(session?.user || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   const [budget, setBudget] = useState<{ monthly_limit: number; yearly_limit: number } | null>(null);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
@@ -1172,11 +1188,11 @@ export function useTools() {
     confirmSubscriptionPayment,
     addProject,
     deleteProject,
-    setCategory: (cat: string | null) => setFilters(prev => ({ ...prev, category: cat })),
-    setSearch: (q: string) => setFilters(prev => ({ ...prev, search: q })),
-    setFavoritesOnly: (v: boolean) => setFilters(prev => ({ ...prev, favoritesOnly: v })),
+    setCategory: (cat: string | null) => setFilters((prev: FilterState) => ({ ...prev, category: cat })),
+    setSearch: (q: string) => setFilters((prev: FilterState) => ({ ...prev, search: q })),
+    setFavoritesOnly: (v: boolean) => setFilters((prev: FilterState) => ({ ...prev, favoritesOnly: v })),
     clearFilters: () => setFilters({ category: null, subcategory: null, search: '', favoritesOnly: false }),
     clearError,
-    refreshTools,
+    refreshTools: () => fetchAllData(),
   };
 }
