@@ -10,42 +10,53 @@ export function useTools(userId?: string) {
 
   const fetchTools = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('tools').select('*');
+    // Adicionamos um select que garante que a estrutura venha correta
+    const { data, error } = await supabase.from('tools').select('*').order('name');
     if (!error && data) setTools(data);
     setLoading(false);
   }, []);
 
   const fetchCategories = useCallback(async () => {
-    const { data, error } = await supabase.from('categories').select('*');
+    const { data, error } = await supabase.from('categories').select('*').order('name');
     if (!error && data) setCategories(data);
   }, []);
 
   const fetchUserTools = useCallback(async (uid: string) => {
+    // AQUI ESTÁ O PONTO CRÍTICO: 
+    // Garantimos que ele tente buscar a tool e a categoria vinculada
     const { data, error } = await supabase
       .from('user_tools')
-      .select('*, tool:tools(*)')
+      .select('*, tool:tools(*, category:categories(*))')
       .eq('user_id', uid);
-    if (!error && data) setUserTools(data);
+    
+    if (!error && data) {
+      // Filtramos entradas onde a 'tool' pode ter vindo nula por erro de integridade no banco
+      const validUserTools = data.filter(ut => ut.tool !== null);
+      setUserTools(validUserTools);
+    }
   }, []);
 
   const addTool = useCallback(async (tool: Omit<Tool, 'id'>) => {
     const { data, error } = await supabase.from('tools').insert(tool).select().single();
+    if (!error) fetchTools(); // Atualiza a lista local
     return { data, error };
-  }, []);
+  }, [fetchTools]);
 
-  const addUserTool = useCallback(async (userId: string, toolId: string) => {
+  const addUserTool = useCallback(async (uid: string, toolId: string) => {
     const { data, error } = await supabase
       .from('user_tools')
-      .insert({ user_id: userId, tool_id: toolId })
+      .insert({ user_id: uid, tool_id: toolId })
       .select()
       .single();
+    if (!error) fetchUserTools(uid); // Atualiza a lista do usuário
     return { data, error };
-  }, []);
+  }, [fetchUserTools]);
 
   const removeUserTool = useCallback(async (userToolId: string) => {
     const { error } = await supabase.from('user_tools').delete().eq('id', userToolId);
+    if (!error && userId) fetchUserTools(userId);
     return !error;
-  }, []);
+  }, [userId, fetchUserTools]);
 
   useEffect(() => {
     fetchTools();
