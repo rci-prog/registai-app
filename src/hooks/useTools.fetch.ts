@@ -1069,16 +1069,18 @@ export function useTools() {
   // ============================================================
   // FILTRAR FERRAMENTAS
   // ============================================================
+  // FILTRAR FERRAMENTAS
+  // ============================================================
   const filteredTools = useMemo(() => {
     console.log('[useTools] filteredTools recalculando...', filters);
 
-    // 1. Filtro inicial com blindagem pesada
+    // 1. Filtro inicial com blindagem contra nulos
     let result = (tools || []).filter((tool: any) => {
       if (!tool || !tool.id) return false;
       return true;
     });
 
-    // 2. Filtro por Categoria (Com tratamento para nulos e case-insensitive)
+    // 2. Filtro por Categoria
     if (filters.category && filters.category !== 'all') {
       result = result.filter(tool => {
         const toolCat = (tool.category || 'Geral').toLowerCase();
@@ -1097,17 +1099,7 @@ export function useTools() {
     }
 
     return result;
-  }, [tools, filters]);
-    }
-
-    // 3. Filtro por Busca
-    if (filters.search) {
-      const query = filters.search.toLowerCase();
-      result = result.filter(tool =>
-        (tool.name || '').toLowerCase().includes(query) ||
-        (tool.description || '').toLowerCase().includes(query)
-      );
-    }
+  }, [tools, filters]); 
 
     // 4. Mapeamento final com trava de segurança absoluta
     return result.map((tool: any) => {
