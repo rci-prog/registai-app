@@ -1070,52 +1070,44 @@ export function useTools() {
   // FILTRAR FERRAMENTAS
   // ============================================================
   const filteredTools = useMemo(() => {
-    console.log('[useTools] filteredTools recalculando. filters:', JSON.stringify(filters), '| total tools:', tools.length);
-    
-    // Filtra apenas ferramentas que realmente existem (não nulas)
-    let result = tools.filter(t => t !== null && t !== undefined);
+    console.log('[useTools] filteredTools recalculando...', filters);
 
-    // 1. Filtro por Categoria (Com trava de segurança)
+    // 1. Filtro inicial com blindagem contra nulos
+    let result = tools.filter((tool: any) => {
+      if (!tool || !tool.id) return false;
+      return true;
+    });
+
+    // 2. Filtro por Categoria (Com fallback seguro)
     if (filters.category) {
       result = result.filter(tool => 
-        tool?.category?.toLowerCase() === filters.category?.toLowerCase()
+        (tool.category || 'Geral').toLowerCase() === filters.category?.toLowerCase()
       );
     }
 
-    // 2. Filtro por Busca (Com trava de segurança)
+    // 3. Filtro por Busca
     if (filters.search) {
       const query = filters.search.toLowerCase();
-      result = result.filter(tool => 
-        tool?.name?.toLowerCase().includes(query) || 
-        tool?.description?.toLowerCase().includes(query)
+      result = result.filter(tool =>
+        (tool.name || '').toLowerCase().includes(query) ||
+        (tool.description || '').toLowerCase().includes(query)
       );
     }
 
-    // 3. Filtro por Favoritos
-    if (filters.favoritesOnly) {
-      result = result.filter(tool => {
-        const userData = userToolsData.get(tool.id);
-        return userData?.is_favorite === true;
-      });
-    }
-
-    // Mapeamento final com verificação
+    // 4. Mapeamento final com trava de segurança absoluta
     return result.map((tool: any) => {
-      // Se tool for indefinido por erro de sincronismo, retorna objeto seguro
-      if (!tool) return { id: 'error', name: 'Erro de carga', category: '' };
-
+      if (!tool || !tool.id) return null;
       const userData = userToolsData.get(tool.id);
       
       return {
         ...tool,
-        // Garante que a propriedade category SEMPRE exista como string
-        category: tool.category || '', 
+        category: tool.category || 'Geral', // Garante que nunca seja undefined
         isFavorite: userData?.is_favorite || false,
         notes: userData?.personal_notes || null,
         rating: userData?.rating || null,
       };
-    });
-  }, [tools, filters, userToolsData, currentUser?.id]);
+    }).filter(Boolean); // Remove qualquer item inválido que tenha sobrado
+  }, [tools, filters, userToolsData]);
   // ============================================================
   // LIMPAR HISTORICO DE ACESSOS
   // ============================================================
