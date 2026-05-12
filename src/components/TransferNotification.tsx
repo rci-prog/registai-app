@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 
 interface TransferNotificationProps {
   theme: string;
+  currentUser?: any; // Adicionado para compatibilidade com o Dashboard
 }
 
 interface Transfer {
@@ -14,7 +15,7 @@ interface Transfer {
   created_at: string;
 }
 
-export function TransferNotification({ theme }: TransferNotificationProps) {
+export function TransferNotification({ theme, currentUser }: TransferNotificationProps) {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
@@ -24,6 +25,7 @@ export function TransferNotification({ theme }: TransferNotificationProps) {
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
+        // No futuro, use 'currentUser' aqui para filtrar apenas as transferências destinadas a este usuário
         setTransfers(parsed.filter((t: Transfer) => t.status === 'pending'));
       } catch { /* ignore */ }
     }
