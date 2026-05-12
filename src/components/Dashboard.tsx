@@ -389,7 +389,7 @@ export function Dashboard() {
             onSearchChange={setSearch}
             onFavoritesOnlyChange={setFavoritesOnly}
             onClearFilters={clearFilters}
-            totalTools={tools.length}
+            totalTools={allTools.length}
             filteredCount={tools.length}
             categoryCounts={categoryCounts}
             onManageCategories={() => setShowManageCategories(true)}
