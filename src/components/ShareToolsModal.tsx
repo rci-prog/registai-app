@@ -14,7 +14,7 @@ interface ShareToolsModalProps {
   currentUser: any; // Adicione esta linha
 }
 
-export function ShareToolsModal({ isOpen, onClose, theme, tools, currentUser }: ShareToolsModalProps) {
+export function ShareToolsModal({ isOpen, onClose, theme, tools }: ShareToolsModalProps) {
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [recipientEmail, setRecipientEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
