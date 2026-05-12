@@ -1164,8 +1164,8 @@ export function useTools() {
   // ============================================================
   return {
     // Dados e Estados
-    tools: filteredTools,
-    allTools: tools,
+    tools: filteredTools || [],
+    allTools: tools || [],
     categories,
     clickData,
     userProjects: projects,
