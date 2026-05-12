@@ -9,11 +9,12 @@ import { Share2, Send } from 'lucide-react';
 interface ShareToolsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  theme: string;
-  tools: any[];
+  theme: 'light' | 'dark';
+  tools: any;
+  currentUser: any; // Adicione esta linha
 }
 
-export function ShareToolsModal({ isOpen, onClose, theme, tools }: ShareToolsModalProps) {
+export function ShareToolsModal({ isOpen, onClose, theme, tools, currentUser }: ShareToolsModalProps) {
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [recipientEmail, setRecipientEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
