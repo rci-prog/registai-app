@@ -1069,14 +1069,6 @@ export function useTools() {
   // ============================================================
   // FILTRAR FERRAMENTAS
   // ============================================================
-  const categoryMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    categories.forEach((cat: Category) => {
-      map[cat.id.toLowerCase()] = cat.name;
-      map[cat.name.toLowerCase()] = cat.name;
-    });
-    return map;
-  }, [categories]);
 
   // ============================================================
   // LIMPAR HISTORICO DE ACESSOS
@@ -1117,7 +1109,7 @@ export function useTools() {
     budget: { 
       monthly: budget?.monthly_limit ?? 0, 
       yearly: budget?.yearly_limit ?? 0 
-    },
+    } as any, 
     subscriptions,
     projects,
     filters,
@@ -1136,14 +1128,14 @@ export function useTools() {
     resetClicks,
     setUserBudget,
     addSubscription,
-    deleteSubscription: (id: string) => (deleteSubscription as any)(id), 
+    deleteSubscription: ((id: string) => (deleteSubscription as any)(id)) as any, 
     confirmSubscriptionPayment,
     addProject,
     deleteProject,
-    setCategory: (cat: string | null) => setFilters((prev: FilterState) => ({ ...prev, category: cat || "" })),
-    setSearch: (q: string) => setFilters((prev: FilterState) => ({ ...prev, search: q || "" })),
-    setFavoritesOnly: (v: boolean) => setFilters((prev: FilterState) => ({ ...prev, favoritesOnly: v })),
-    clearFilters: () => setFilters({ category: null, subcategory: null, search: '', favoritesOnly: false }),
+    setCategory: ((cat: string | null) => setFilters((prev: any) => ({ ...prev, category: cat || "" }))) as any,
+    setSearch: ((q: string) => setFilters((prev: any) => ({ ...prev, search: q || "" }))) as any,
+    setFavoritesOnly: (v: boolean) => setFilters((prev: any) => ({ ...prev, favoritesOnly: v })),
+    clearFilters: () => setFilters({ category: "", subcategory: "", search: "", favoritesOnly: false }),
     clearError,
     refreshTools: () => fetchAllData(),
   };
