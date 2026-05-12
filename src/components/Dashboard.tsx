@@ -209,7 +209,6 @@ export function Dashboard() {
 
   // Calcular contagem por categoria (case-insensitive, mapeia por id e por nome)
   // Usa 'allTools' (todas as ferramentas disponiveis no Supabase)
-  // CORRECAO: (tool.category || 'Geral') para evitar undefined
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     
@@ -219,7 +218,7 @@ export function Dashboard() {
     });
 
     // 1. Filtramos apenas ferramentas válidas antes de contar
-    const validTools = (allTools || []).filter(t => t && (t.category || t.category?.name));
+    const validTools = (allTools || []).filter(t => t && (t.category || (t.category as any)?.name));
 
     validTools.forEach((tool: any) => {
       // 2. Normalização da categoria (Trata se for String ou Objeto)
@@ -231,8 +230,8 @@ export function Dashboard() {
 
       // 3. Busca a categoria correspondente nas suas categorias cadastradas
       const matchingCat = categories.find((cat: any) => 
-        cat.id?.toLowerCase() === toolCatLower || 
-        cat.name?.toLowerCase() === toolCatLower
+        (cat.id || '').toLowerCase() === toolCatLower || 
+        (cat.name || '').toLowerCase() === toolCatLower
       );
 
       // 4. Soma no contador do gráfico
@@ -240,12 +239,6 @@ export function Dashboard() {
       counts[finalKey] = (counts[finalKey] || 0) + 1;
     });
 
-      if (matchingCat) {
-        counts[matchingCat.name] = (counts[matchingCat.name] || 0) + 1;
-      } else {
-        counts['Geral'] = (counts['Geral'] || 0) + 1;
-      }
-    });
     return counts;
   }, [allTools, categories]);
 
