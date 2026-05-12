@@ -1066,18 +1066,6 @@ export function useTools() {
 
   const clearError = useCallback(() => setError(null), []);
 
-  const setCategory = useCallback((c: string | null) =>
-    setFilters(p => ({ ...p, category: c, subcategory: null })), []);
-
-  const setSearch = useCallback((s: string) =>
-    setFilters(p => ({ ...p, search: s })), []);
-
-  const setFavoritesOnly = useCallback((f: boolean) =>
-    setFilters(p => ({ ...p, favoritesOnly: f })), []);
-
-  const clearFilters = useCallback(() =>
-    setFilters({ category: null, subcategory: null, search: '', favoritesOnly: false }), []);
-
   // ============================================================
   // FILTRAR FERRAMENTAS
   // ============================================================
@@ -1089,44 +1077,6 @@ export function useTools() {
     });
     return map;
   }, [categories]);
-
-  const filteredTools = useMemo(() => {
-    const userId = currentUser?.id;
-    let result = tools.filter((tool: Tool) => {
-      const isOwner = tool.created_by === userId;
-      const inUserTools = userToolsData.has(tool.id);
-      if (!isOwner && !inUserTools) return false;
-      if (filters.category) {
-        const filterLower = filters.category.toLowerCase();
-        const toolCatLower = tool.category.toLowerCase();
-        if (toolCatLower !== filterLower && toolCatLower !== categoryMap[filterLower]?.toLowerCase()) {
-          return false;
-        }
-      }
-      if (filters.favoritesOnly) {
-        const userData = userToolsData.get(tool.id);
-        if (!userData?.is_favorite) return false;
-      }
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        const matchesName = tool.name.toLowerCase().includes(searchLower);
-        const matchesDesc = tool.description?.toLowerCase().includes(searchLower);
-        const matchesCategory = tool.category.toLowerCase().includes(searchLower);
-        if (!matchesName && !matchesDesc && !matchesCategory) return false;
-      }
-      return true;
-    });
-
-    return result.map((tool: Tool) => {
-      const userData = userToolsData.get(tool.id);
-      return {
-        ...tool,
-        isFavorite: userData?.is_favorite || false,
-        notes: userData?.personal_notes || null,
-        rating: userData?.rating || null,
-      };
-    });
-  }, [tools, filters, userToolsData, categoryMap, currentUser?.id]);
 
   // ============================================================
   // LIMPAR HISTORICO DE ACESSOS
