@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { getAuth } from '@/lib/supabase-simple';
+import { supabase as getAuth } from '@/lib/supabase';
 import type { FilterState } from '@/types';
 import { categories as defaultCategories } from '@/data/tools';
 
@@ -1142,11 +1142,14 @@ export function useTools() {
   // RETURN
   // ============================================================
   return {
-    tools: filteredTools,
+    tools,
     allTools: tools,
     categories,
-    clickData,
-    budget,
+    clickData: Array.from(clickData.entries()).map(([tool_id, count]) => ({ tool_id, count })),
+    budget: { 
+      monthly: budget?.monthly_limit ?? 0, 
+      yearly: budget?.yearly_limit ?? 0 
+    },
     subscriptions,
     projects,
     filters,
@@ -1162,18 +1165,18 @@ export function useTools() {
     editCategory,
     deleteCategory,
     recordAccess,
+    resetClicks,
     setUserBudget,
     addSubscription,
-    deleteSubscription,
+    deleteSubscription: async (id: string) => deleteSubscription(id),
     confirmSubscriptionPayment,
     addProject,
     deleteProject,
-    resetClicks,
-    setCategory,
-    setSearch,
-    setFavoritesOnly,
-    clearFilters,
+    setCategory: (cat: string | null) => setFilters(prev => ({ ...prev, category: cat })),
+    setSearch: (q: string) => setFilters(prev => ({ ...prev, search: q })),
+    setFavoritesOnly: (v: boolean) => setFilters(prev => ({ ...prev, favoritesOnly: v })),
+    clearFilters: () => setFilters({ category: null, subcategory: null, search: '', favoritesOnly: false }),
     clearError,
-    refreshTools: fetchAllData,
+    refreshTools,
   };
 }
