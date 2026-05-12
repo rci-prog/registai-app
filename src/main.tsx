@@ -19,9 +19,16 @@ class ErrorBoundary extends Component<EBProps, EBState> {
     return { hasError: true, error }
   }
 
-  componentDidCatch(error: Error, info: any) {
+  
+    componentDidCatch(error: Error, info: any) {
     console.error('[ErrorBoundary] Erro capturado:', error)
     console.error('[ErrorBoundary] Info:', info)
+    // DIAGNOSTICO: tentar identificar qual componente quebrou pelo stack
+    const stack = error.stack || '';
+    const match = stack.match(/at\s+(\w+)\s+\(/);
+    const fnName = match ? match[1] : 'desconhecido';
+    console.error('[ErrorBoundary] Funcao que quebrou:', fnName);
+    console.error('[ErrorBoundary] Stack completo:', stack);
   }
 
   render() {
