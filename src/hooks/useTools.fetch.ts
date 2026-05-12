@@ -644,18 +644,24 @@ export function useTools() {
     }
 
     try {
-      const newTool = {
-        name: toolData.name,
-        description: toolData.description || null,
-        url: toolData.url,
-        category: toolData.category,
-        subcategory: toolData.subcategory || null,
-        image_url: toolData.image_url || null,
-        created_by: currentUser.id,
-        admin_id: currentUser.id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+      // 5ª CORREÇÃO: Blindagem de categoria antes de criar o objeto
+    let categoryValue = toolData.category;
+    if (typeof categoryValue === 'object' && categoryValue !== null) {
+      categoryValue = categoryValue.name || categoryValue.id || 'Geral';
+    }
+
+    const newTool = {
+      name: toolData.name,
+      description: toolData.description || null,
+      url: toolData.url,
+      category: (categoryValue || 'Geral').toString().trim(), // Aqui entra o valor blindado
+      subcategory: toolData.subcategory || null,
+      image_url: toolData.image_url || null,
+      created_by: currentUser.id,
+      admin_id: currentUser.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
 
       const result = await supabaseInsert('tools', newTool);
       console.log('[useTools] SALVO - Ferramenta criada');
