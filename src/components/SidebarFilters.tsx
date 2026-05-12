@@ -1,73 +1,239 @@
-import { Search, X, Heart, FolderOpen } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import {
+  Search,
+  X,
+  MessageSquare,
+  Image,
+  Video,
+  Presentation,
+  Music,
+  Briefcase,
+  Code,
+  FileText,
+  Heart,
+  Filter,
+  FolderOpen,
+  Settings
+} from 'lucide-react';
+import { useState } from 'react';
+import type { Category } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SidebarFiltersProps {
-  categories: any[];
-  selectedCategory: string;
-  selectedSubcategory: string;
+  categories: Category[];
+  selectedCategory: string | null;
+  selectedSubcategory: string | null;
   searchQuery: string;
   favoritesOnly: boolean;
-  onCategorySelect: (cat: string) => void;
-  onSubcategorySelect: (sub: string) => void;
-  onSearchChange: (q: string) => void;
-  onFavoritesOnlyChange: (v: boolean) => void;
+  onCategorySelect: (category: string | null) => void;
+  onSubcategorySelect: (subcategory: string | null) => void;
+  onSearchChange: (query: string) => void;
+  onFavoritesOnlyChange: (value: boolean) => void;
   onClearFilters: () => void;
   totalTools: number;
   filteredCount: number;
   categoryCounts: Record<string, number>;
-  onManageCategories: () => void;
+  onManageCategories?: () => void;
 }
 
+const categoryIcons: Record<string, React.ReactNode> = {
+  'Chatbots': <MessageSquare className="w-4 h-4" />,
+  'Imagens': <Image className="w-4 h-4" />,
+  'Vídeos': <Video className="w-4 h-4" />,
+  'Apresentações': <Presentation className="w-4 h-4" />,
+  'Áudio': <Music className="w-4 h-4" />,
+  'Produtividade': <Briefcase className="w-4 h-4" />,
+  'Desenvolvimento': <Code className="w-4 h-4" />,
+  'PDF': <FileText className="w-4 h-4" />,
+};
+
 export function SidebarFilters({
-  categories, selectedCategory, searchQuery, favoritesOnly,
-  onCategorySelect, onSearchChange, onFavoritesOnlyChange, onClearFilters,
-  categoryCounts, onManageCategories,
+  categories,
+  selectedCategory,
+  selectedSubcategory,
+  searchQuery,
+  favoritesOnly,
+  onCategorySelect,
+  onSubcategorySelect,
+  onSearchChange,
+  onFavoritesOnlyChange,
+  onClearFilters,
+  totalTools,
+  filteredCount,
+  categoryCounts,
+  onManageCategories,
 }: SidebarFiltersProps) {
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+  const { theme } = useAuth();
+  const isDark = theme === 'dark';
+
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategories(prev =>
+      prev.includes(categoryId)
+        ? prev.filter(id => id !== categoryId)
+        : [...prev, categoryId]
+    );
+  };
+
+  const hasActiveFilters = selectedCategory || selectedSubcategory || searchQuery || favoritesOnly;
+
   return (
-    <div className="w-64 min-h-screen border-r border-slate-800 bg-slate-950 p-4 space-y-4">
-      <div className="space-y-2">
-        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Buscar</h3>
+    <div className={`w-80 border-r flex flex-col h-full ${isDark ? 'bg-[#0b1120] border-slate-800' : 'bg-gray-50 border-gray-200'}`}>
+      {/* Header — Ícone funil roxo, título Filtros, contador */}
+      <div className={`p-5 border-b ${isDark ? 'border-slate-800' : 'border-gray-200'}`}>
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-9 h-9 bg-violet-600 rounded-lg flex items-center justify-center shadow-lg shadow-violet-600/20">
+            <Filter className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h2 className={`text-lg font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              Filtros
+            </h2>
+          </div>
+        </div>
+        <p className={`text-xs ml-12 mb-4 ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
+          {filteredCount} de {totalTools} ferramentas
+        </p>
+
+        {/* Search */}
         <div className="relative">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <Input value={searchQuery} onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Buscar ferramentas..." className="pl-8 bg-slate-900 border-slate-700 text-white text-sm" />
+          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
+          <Input
+            placeholder="Buscar ferramentas..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className={`pl-10 h-10 text-sm ${isDark ? 'bg-slate-800/80 border-slate-700 text-white placeholder:text-slate-500 focus:border-violet-500 focus:ring-violet-500/20' : 'bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 focus:border-violet-500'}`}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => onSearchChange('')}
+              className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
+
+        {/* Favorites Toggle — Coração + interruptor */}
+        <div className="flex items-center justify-between mt-4 px-1">
+          <div className="flex items-center gap-2.5">
+            <Heart className={`w-4 h-4 ${favoritesOnly ? 'text-red-400 fill-red-400' : isDark ? 'text-slate-500' : 'text-gray-400'}`} />
+            <Label htmlFor="favorites" className={`text-sm cursor-pointer font-medium ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
+              Apenas favoritos
+            </Label>
+          </div>
+          <Switch
+            id="favorites"
+            checked={favoritesOnly}
+            onCheckedChange={onFavoritesOnlyChange}
+            className="data-[state=checked]:bg-violet-600"
+          />
+        </div>
+
+        {/* Clear Filters */}
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClearFilters}
+            className={`w-full mt-3 text-xs ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+          >
+            <X className="w-3.5 h-3.5 mr-2" />
+            Limpar filtros
+          </Button>
+        )}
       </div>
 
-      <div className="space-y-2">
-        <button onClick={() => onFavoritesOnlyChange(!favoritesOnly)}
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${favoritesOnly ? 'bg-violet-600/20 text-violet-400' : 'text-slate-400 hover:bg-slate-900'}`}>
-          <Heart className={`w-4 h-4 ${favoritesOnly ? 'fill-current' : ''}`} />
-          Favoritos
-        </button>
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Categorias</h3>
-          <button onClick={onManageCategories} className="text-[10px] text-violet-400 hover:text-violet-300">Gerenciar</button>
-        </div>
-        <button onClick={() => onCategorySelect('')}
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${!selectedCategory ? 'bg-violet-600/20 text-violet-400' : 'text-slate-400 hover:bg-slate-900'}`}>
-          <FolderOpen className="w-4 h-4" />
-          Todas
-          <span className="ml-auto text-xs text-slate-600">{Object.values(categoryCounts).reduce((a: any, b: any) => a + b, 0)}</span>
-        </button>
-        {categories.map((cat: any) => (
-          <button key={cat.id} onClick={() => onCategorySelect(cat.id)}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${selectedCategory === cat.id ? 'bg-violet-600/20 text-violet-400' : 'text-slate-400 hover:bg-slate-900'}`}>
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color || '#8b5cf6' }} />
-            {cat.name}
-            <span className="ml-auto text-xs text-slate-600">{categoryCounts[cat.id] || 0}</span>
+      {/* Categories */}
+      <ScrollArea className="flex-1">
+        <div className="p-3">
+          {/* All Categories — contador roxo quando selecionado */}
+          <button
+            onClick={() => {
+              onCategorySelect(null);
+              onSubcategorySelect(null);
+            }}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+              !selectedCategory
+                ? 'bg-violet-600/15 text-violet-400 border border-violet-500/25'
+                : `${isDark ? 'text-slate-400 hover:bg-slate-800/60 hover:text-white' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`
+            }`}
+          >
+            <FolderOpen className={`w-4 h-4 flex-shrink-0 ${!selectedCategory ? 'text-violet-400' : isDark ? 'text-slate-500' : 'text-gray-400'}`} />
+            <span className="flex-1 text-sm font-medium">Todas as categorias</span>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+              !selectedCategory
+                ? 'bg-violet-600/20 text-violet-400'
+                : isDark ? 'text-slate-600 bg-slate-800' : 'text-gray-500 bg-gray-100'
+            }`}>
+              {totalTools}
+            </span>
           </button>
-        ))}
-      </div>
 
-      {(selectedCategory || searchQuery || favoritesOnly) && (
-        <button onClick={onClearFilters} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-400 hover:bg-slate-900 transition-colors">
-          <X className="w-4 h-4" /> Limpar filtros
+          {/* Divider */}
+          <div className={`my-2 h-px ${isDark ? 'bg-slate-800' : 'bg-gray-200'}`} />
+
+          {/* Category List */}
+          <div className="space-y-0.5">
+            {categories.map((category) => {
+              const isExpanded = expandedCategories.includes(category.id);
+              const isSelected = selectedCategory === category.id;
+              const count = categoryCounts[category.id] || 0;
+
+              return (
+                <div key={category.id}>
+                  <button
+                    onClick={() => {
+                      if (isSelected) {
+                        onCategorySelect(null);
+                        onSubcategorySelect(null);
+                        if (isExpanded) toggleCategory(category.id);
+                      } else {
+                        onCategorySelect(category.id);
+                        if (!isExpanded) toggleCategory(category.id);
+                      }
+                    }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+                      isSelected
+                        ? 'bg-violet-600/15 text-violet-400 border border-violet-500/25'
+                        : `${isDark ? 'text-slate-400 hover:bg-slate-800/60 hover:text-white' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`
+                    }`}
+                  >
+                    <div className={`flex-shrink-0 ${isSelected ? 'text-violet-400' : isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+                      {categoryIcons[category.id] || <FolderOpen className="w-4 h-4" />}
+                    </div>
+                    <span className="flex-1 text-sm font-medium">{category.name}</span>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      isSelected
+                        ? 'bg-violet-600/20 text-violet-400'
+                        : isDark ? 'text-slate-600 bg-slate-800' : 'text-gray-500 bg-gray-100'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </ScrollArea>
+
+      {/* Footer — Gerenciar categorias */}
+      <div className={`p-3 border-t ${isDark ? 'border-slate-800' : 'border-gray-200'}`}>
+        <button
+          onClick={onManageCategories}
+          className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-all text-left ${
+            isDark ? 'text-slate-400 hover:bg-slate-800/60 hover:text-white' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+          }`}
+        >
+          <Settings className={`w-4 h-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
+          <span className="text-sm font-medium">Gerenciar categorias</span>
         </button>
-      )}
+      </div>
     </div>
   );
 }
