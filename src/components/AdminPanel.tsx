@@ -4,7 +4,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useAuth } from '@/contexts/AuthContext';
 import { useAdClicks } from '@/hooks/useAdClicks';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -74,7 +73,7 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeout = 100
 // ============================================================
 // COMPONENT
 // ============================================================
-export function AdminPanel({ open, onClose }: AdminPanelProps) {
+export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps) {
 
   // Users
   const [localUsers, setLocalUsers] = useState<AdminUser[]>([]);
