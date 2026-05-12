@@ -218,7 +218,7 @@ export function Dashboard() {
     });
 
     // 1. Filtramos apenas ferramentas válidas antes de contar
-    const validTools = (allTools || []).filter(t => t && (t.category || (t.category as any)?.name));
+    const validTools = (allTools || []).filter((t: any) => t && (t.category || (t.category as any)?.name));
 
     validTools.forEach((tool: any) => {
       // 2. Normalização da categoria (Trata se for String ou Objeto)
