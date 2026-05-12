@@ -1,6 +1,8 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { categories as defaultCategories } from '@/data/tools';
+
+const defaultCategories: any[] = [];
+
 export interface FilterState {
   category: string | null;
   subcategory: string | null;
@@ -1184,12 +1186,12 @@ export function useTools() {
     resetClicks,
     setUserBudget,
     addSubscription,
-    deleteSubscription: async (id: string) => deleteSubscription(id),
+    deleteSubscription: (id: string) => (deleteSubscription as any)(id), 
     confirmSubscriptionPayment,
     addProject,
     deleteProject,
-    setCategory: (cat: string | null) => setFilters((prev: FilterState) => ({ ...prev, category: cat })),
-    setSearch: (q: string) => setFilters((prev: FilterState) => ({ ...prev, search: q })),
+    setCategory: (cat: string | null) => setFilters((prev: FilterState) => ({ ...prev, category: cat || "" })),
+    setSearch: (q: string) => setFilters((prev: FilterState) => ({ ...prev, search: q || "" })),
     setFavoritesOnly: (v: boolean) => setFilters((prev: FilterState) => ({ ...prev, favoritesOnly: v })),
     clearFilters: () => setFilters({ category: null, subcategory: null, search: '', favoritesOnly: false }),
     clearError,
