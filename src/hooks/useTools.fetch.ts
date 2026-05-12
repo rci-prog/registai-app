@@ -1069,7 +1069,49 @@ export function useTools() {
   // ============================================================
   // FILTRAR FERRAMENTAS
   // ============================================================
+  const filteredTools = useMemo(() => {
+    console.log('[useTools] filteredTools recalculando. filters:', JSON.stringify(filters), '| total tools:', tools.length);
+    
+    let result = [...tools];
 
+    // 1. Filtro por Categoria
+    if (filters.category) {
+      result = result.filter(tool => 
+        tool.category?.toLowerCase() === filters.category?.toLowerCase()
+      );
+    }
+
+    // 2. Filtro por Busca (Search)
+    if (filters.search) {
+      const query = filters.search.toLowerCase();
+      result = result.filter(tool => 
+        tool.name?.toLowerCase().includes(query) || 
+        tool.description?.toLowerCase().includes(query)
+      );
+    }
+
+    // 3. Filtro por Favoritos
+    if (filters.favoritesOnly) {
+      result = result.filter(tool => {
+        const userData = userToolsData.get(tool.id);
+        return userData?.is_favorite === true;
+      });
+    }
+
+    // Mapear dados do usuário (Favoritos, Notas, etc.)
+    const mapped = result.map((tool: any) => {
+      const userData = userToolsData.get(tool.id);
+      return {
+        ...tool,
+        isFavorite: userData?.is_favorite || false,
+        notes: userData?.personal_notes || null,
+        rating: userData?.rating || null,
+      };
+    });
+
+    console.log('[useTools] filteredTools resultado:', mapped.length, 'ferramentas');
+    return mapped;
+  }, [tools, filters, userToolsData, currentUser?.id]);
   // ============================================================
   // LIMPAR HISTORICO DE ACESSOS
   // ============================================================
@@ -1102,7 +1144,7 @@ export function useTools() {
   // RETURN
   // ============================================================
   return {
-    tools,
+    tools: filteredTools,
     allTools: tools,
     categories,
     clickData: Array.from(clickData.entries()).map(([tool_id, count]) => ({ tool_id, count })),
