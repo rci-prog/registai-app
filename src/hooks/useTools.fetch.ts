@@ -1128,15 +1128,15 @@ export function useTools() {
     resetClicks,
     setUserBudget,
     addSubscription,
-    deleteSubscription: ((id: string) => (deleteSubscription as any)(id)) as any, 
+    deleteSubscription: (async (id: string) => await (deleteSubscription as any)(id)) as any, 
     confirmSubscriptionPayment,
     addProject,
     deleteProject,
-    setCategory: ((cat: string | null) => setFilters((prev: any) => ({ ...prev, category: cat || "" }))) as any,
-    setSearch: ((q: string) => setFilters((prev: any) => ({ ...prev, search: q || "" }))) as any,
-    setFavoritesOnly: ((v: boolean) => setFilters((prev: any) => ({ ...prev, favoritesOnly: v }))) as any,
+    setCategory: ((cat: any) => setFilters((prev: any) => ({ ...prev, category: cat || "" }))) as any,
+    setSearch: ((q: any) => setFilters((prev: any) => ({ ...prev, search: q || "" }))) as any,
+    setFavoritesOnly: ((v: any) => setFilters((prev: any) => ({ ...prev, favoritesOnly: !!v }))) as any,
     clearFilters: (() => setFilters({ category: "", subcategory: "", search: "", favoritesOnly: false })) as any,
     clearError,
     refreshTools: () => fetchAllData(),
-  };
+  } as any;
 }
