@@ -1,4 +1,3 @@
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -148,8 +147,8 @@ export function SidebarFilters({
         )}
       </div>
 
-      {/* Categories */}
-      <ScrollArea className="flex-1">
+      {/* Categories — scroll nativo CSS */}
+      <div className="flex-1 overflow-y-auto">
         <div className="p-3">
           {/* All Categories — contador roxo quando selecionado */}
           <button
@@ -220,7 +219,7 @@ export function SidebarFilters({
             })}
           </div>
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Footer — Gerenciar categorias */}
       <div className={`p-3 border-t ${isDark ? 'border-slate-800' : 'border-gray-200'}`}>
