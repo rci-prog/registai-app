@@ -221,19 +221,27 @@ export function Dashboard() {
     // Contar TODAS as ferramentas disponíveis
     // BLINDAGEM: Adicionado check 'if (!tool)' para evitar crash
     allTools.forEach((tool: any) => {
+      // 1. BLINDAGEM TOTAL: Se a ferramenta não existir, pula.
       if (!tool) return; 
 
-      // NORMALIZAÇÃO: Garante que tratamos a categoria como string
-      const toolCat = typeof tool.category === 'string' 
+      // 2. Pegar a categoria com fallback
+      const rawCat = typeof tool.category === 'string' 
         ? tool.category 
         : (tool.category?.name || 'Geral');
 
+      const toolCatLower = rawCat.toLowerCase();
+
+      // 3. Encontrar a categoria correspondente
       const matchingCat = categories.find((cat: any) => 
-        cat.id === toolCat || cat.name === toolCat
+        cat.id?.toLowerCase() === toolCatLower || 
+        cat.name?.toLowerCase() === toolCatLower
       );
 
-      const finalKey = matchingCat ? matchingCat.name : 'Geral';
-      counts[finalKey] = (counts[finalKey] || 0) + 1;
+      if (matchingCat) {
+        counts[matchingCat.name] = (counts[matchingCat.name] || 0) + 1;
+      } else {
+        counts['Geral'] = (counts['Geral'] || 0) + 1;
+      }
     });
     return counts;
   }, [allTools, categories]);
