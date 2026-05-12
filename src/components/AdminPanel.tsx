@@ -74,8 +74,7 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeout = 100
 // ============================================================
 // COMPONENT
 // ============================================================
-export function AdminPanel({ open, onClose, theme, currentUserEmail }: AdminPanelProps) {
-  const { currentUser } = useAuth();
+export function AdminPanel({ open, onClose }: AdminPanelProps) {
 
   // Users
   const [localUsers, setLocalUsers] = useState<AdminUser[]>([]);
