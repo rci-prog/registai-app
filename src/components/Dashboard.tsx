@@ -212,22 +212,28 @@ export function Dashboard() {
   // CORRECAO: (tool.category || 'Geral') para evitar undefined
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    // Inicializar com 0 para todas as categorias
+    
+    // Inicializar com 0 para todas as categorias conhecidas
     categories.forEach((cat: any) => {
-      counts[cat.id] = 0;
       counts[cat.name] = 0;
     });
-    // Contar TODAS as ferramentas disponiveis (nao so as filtradas)
+
+    // Contar TODAS as ferramentas disponíveis
+    // BLINDAGEM: Adicionado check 'if (!tool)' para evitar crash
     allTools.forEach((tool: any) => {
-      const toolCatLower = (tool.category || 'Geral').toLowerCase();
-      // Encontrar a categoria correspondente (case-insensitive)
+      if (!tool) return; 
+
+      // NORMALIZAÇÃO: Garante que tratamos a categoria como string
+      const toolCat = typeof tool.category === 'string' 
+        ? tool.category 
+        : (tool.category?.name || 'Geral');
+
       const matchingCat = categories.find((cat: any) => 
-        cat.id.toLowerCase() === toolCatLower || 
-        cat.name.toLowerCase() === toolCatLower
+        cat.id === toolCat || cat.name === toolCat
       );
-      if (matchingCat) {
-        counts[matchingCat.id] = (counts[matchingCat.id] || 0) + 1;
-      }
+
+      const finalKey = matchingCat ? matchingCat.name : 'Geral';
+      counts[finalKey] = (counts[finalKey] || 0) + 1;
     });
     return counts;
   }, [allTools, categories]);
