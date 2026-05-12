@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'; // Adicionado useEffect para sincronismo
+import { useState, useEffect } from 'react';
 import {
   Heart, ExternalLink, Edit, Trash2, Star, FileText, MoreVertical
 } from 'lucide-react';
@@ -67,17 +67,15 @@ export function ToolCard({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [notes, setNotes] = useState(tool?.notes || '');
   
-  // Estado de Edição normalizado para Texto
   const [editData, setEditData] = useState({
     id: tool?.id || '', 
     name: tool?.name || '', 
     description: tool?.description || '',
     url: tool?.url || '', 
-    category: toolCategoryName, // Agora inicia como String
+    category: toolCategoryName,
     image_url: tool?.image_url || '',
   });
 
-  // Sincroniza o estado de edição quando a ferramenta mudar
   useEffect(() => {
     setEditData({
       id: tool?.id || '',
@@ -93,11 +91,10 @@ export function ToolCard({
   
   const handleEdit = () => { 
     if (tool) {
-      // Garante que estamos enviando a categoria como string no update
       onEdit?.({ 
         ...tool, 
         ...editData,
-        category: editData.category // Persistência como Texto
+        category: editData.category
       }); 
     }
     setShowEdit(false); 
@@ -197,7 +194,6 @@ export function ToolCard({
         </div>
       </div>
 
-      {/* MODAL DE NOTAS */}
       <Dialog open={showNotes} onOpenChange={setShowNotes}>
         <DialogContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}>
           <DialogHeader>
@@ -214,7 +210,6 @@ export function ToolCard({
         </DialogContent>
       </Dialog>
 
-      {/* MODAL DE EDIÇÃO (Ajustado para Salvar Texto) */}
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
         <DialogContent className={`max-w-lg ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}`}>
           <DialogHeader>
@@ -229,7 +224,6 @@ export function ToolCard({
               <Select value={editData.category} onValueChange={(v) => setEditData({ ...editData, category: v })}>
                 <SelectTrigger className={theme === 'dark' ? 'bg-slate-800 text-white' : ''}><SelectValue /></SelectTrigger>
                 <SelectContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : ''}>
-                  {/* CORREÇÃO AQUI: Agora passamos cat.name no value */}
                   {categories.map((cat) => (
                     <SelectItem key={cat.id} value={cat.name}>
                       {cat.name}
@@ -247,7 +241,6 @@ export function ToolCard({
         </DialogContent>
       </Dialog>
 
-      {/* ALERT DELETE */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : ''}>
           <AlertDialogHeader>
