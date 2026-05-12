@@ -1140,29 +1140,74 @@ export function useTools() {
     }
   }, [currentUser?.id]);
 
+// ============================================================
+  // SETTERS DE FILTROS (Garantindo que existam no escopo)
   // ============================================================
-  // RETURN
+  const setCategory = useCallback((c: string | null) => {
+    console.log('[useTools] setCategory chamado:', c);
+    setFilters(p => ({ ...p, category: c, subcategory: null }));
+  }, []);
+
+  const setSearch = useCallback((s: string) => {
+    console.log('[useTools] setSearch chamado:', s);
+    setFilters(p => ({ ...p, search: s }));
+  }, []);
+
+  const setFavoritesOnly = useCallback((f: boolean) => {
+    console.log('[useTools] setFavoritesOnly chamado:', f);
+    setFilters(p => ({ ...p, favoritesOnly: f }));
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    console.log('[useTools] clearFilters chamado');
+    setFilters({ category: null, subcategory: null, search: '', favoritesOnly: false });
+  }, []);
+
+  // ============================================================
+  // RETURN FINAL (Sincronizado com todas as funções do arquivo)
   // ============================================================
   return {
+    // Dados e Estados
     tools: filteredTools,
     allTools: tools,
     categories,
-    userProjects: projects,      // Ajustado de userProjects para projects
-    userBudget: budget,          // Ajustado de userBudget para budget
-    userSubscriptions: subscriptions, // Ajustado de userSubscriptions para subscriptions
-    stats: { total: tools.length }, // Criando um objeto stats básico para evitar erro
-    loading: isLoading,          // Ajustado de loading para isLoading
+    userProjects: projects,
+    userBudget: budget,
+    userSubscriptions: subscriptions,
+    loading: isLoading,
     error,
-    addSubscription,
-    updateSubscription: (id: string, data: any) => supabaseUpdate('user_subscriptions', id, data),
-    deleteSubscription,
-    addProject,
-    deleteProject,
+    
+    // Filtros e Busca
     setCategory,
     setSearch,
     setFavoritesOnly,
     clearFilters,
     clearError,
+
+    // Gerenciamento de Ferramentas (Resolve erros TS6133)
+    saveNotes,
+    saveRating,
+    toggleFavorite,
+    addTool,
+    editTool,
+    deleteTool,
+    
+    // Categorias e Acessos (Resolve erros TS6133)
+    addCategory,
+    editCategory,
+    deleteCategory,
+    recordAccess,
+    resetClicks,
+    
+    // Financeiro e Projetos
+    setUserBudget,
+    addSubscription,
+    updateSubscription: (id: string, data: any) => supabaseUpdate('user_subscriptions', id, data),
+    deleteSubscription,
+    confirmSubscriptionPayment,
+    addProject,
+    deleteProject,
+    
     refreshTools: () => fetchAllData(),
   } as any;
 }
