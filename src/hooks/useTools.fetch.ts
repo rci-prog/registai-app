@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const defaultCategories: any[] = [];
@@ -1147,17 +1147,17 @@ export function useTools() {
     tools: filteredTools,
     allTools: tools,
     categories,
-    userProjects,
-    userBudget,
-    userSubscriptions,
-    stats,
-    loading,
+    userProjects: projects,      // Ajustado de userProjects para projects
+    userBudget: budget,          // Ajustado de userBudget para budget
+    userSubscriptions: subscriptions, // Ajustado de userSubscriptions para subscriptions
+    stats: { total: tools.length }, // Criando um objeto stats básico para evitar erro
+    loading: isLoading,          // Ajustado de loading para isLoading
     error,
-    addSubscription: (data: any) => supabaseInsert('user_subscriptions', data),
+    addSubscription,
     updateSubscription: (id: string, data: any) => supabaseUpdate('user_subscriptions', id, data),
-    deleteSubscription: (id: string) => supabaseDelete('user_subscriptions', id),
-    addProject: (data: any) => supabaseInsert('user_projects', data),
-    deleteProject: (id: string) => supabaseDelete('user_projects', id),
+    deleteSubscription,
+    addProject,
+    deleteProject,
     setCategory,
     setSearch,
     setFavoritesOnly,
