@@ -1067,9 +1067,7 @@ export function useTools() {
   const clearError = useCallback(() => setError(null), []);
 
   // ============================================================
-  // FILTRAR FERRAMENTAS
-  // ============================================================
-  // FILTRAR FERRAMENTAS
+  // FILTRAR E PROCESSAR FERRAMENTAS (Lógica Unificada)
   // ============================================================
   const filteredTools = useMemo(() => {
     console.log('[useTools] filteredTools recalculando...', filters);
@@ -1098,22 +1096,19 @@ export function useTools() {
       );
     }
 
-    return result;
-  }, [tools, filters]); 
-
-    // 4. Mapeamento final com trava de segurança absoluta
+    // 4. Mapeamento final com trava de segurança absoluta (DENTRO do mesmo useMemo)
     return result.map((tool: any) => {
-      if (!tool || !tool.id) return null;
       const userData = userToolsData.get(tool.id);
       
       return {
         ...tool,
-        category: tool.category || 'Geral', // Garante que nunca seja undefined
+        category: tool.category || 'Geral',
         isFavorite: userData?.is_favorite || false,
         notes: userData?.personal_notes || null,
         rating: userData?.rating || null,
       };
-    }).filter(Boolean); // Remove qualquer item inválido que tenha sobrado
+    }).filter(Boolean);
+
   }, [tools, filters, userToolsData]);
   // ============================================================
   // LIMPAR HISTORICO DE ACESSOS
