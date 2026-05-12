@@ -1132,10 +1132,28 @@ export function useTools() {
     confirmSubscriptionPayment,
     addProject,
     deleteProject,
-    setCategory: ((cat: any) => setFilters((prev: any) => ({ ...prev, category: cat || "" }))) as any,
-    setSearch: ((q: any) => setFilters((prev: any) => ({ ...prev, search: q || "" }))) as any,
-    setFavoritesOnly: ((v: any) => setFilters((prev: any) => ({ ...prev, favoritesOnly: !!v }))) as any,
-    clearFilters: (() => setFilters({ category: "", subcategory: "", search: "", favoritesOnly: false })) as any,
+    const setCategory = useCallback((c: string | null) => {
+    console.log('[useTools] setCategory chamado:', c);
+    setFilters(p => ({ ...p, category: c, subcategory: null }));
+  }, []);
+    const setSearch = useCallback((s: string) => {
+    console.log('[useTools] setSearch chamado:', s);
+    setFilters(p => ({ ...p, search: s }));
+  }, []);
+    const setFavoritesOnly = useCallback((f: boolean) => {
+    console.log('[useTools] setFavoritesOnly chamado:', f);
+    setFilters(p => ({ ...p, favoritesOnly: f }));
+  }, []);
+    const clearFilters = useCallback(() => {
+    console.log('[useTools] clearFilters chamado');
+    setFilters({ category: null, subcategory: null, search: '', favoritesOnly: false });
+  }, []);
+  
+  return {
+    setCategory,
+    setSearch,
+    setFavoritesOnly,
+    clearFilters,
     clearError,
     refreshTools: () => fetchAllData(),
   } as any;
