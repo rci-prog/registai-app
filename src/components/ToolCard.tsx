@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Adicionado useEffect para sincronismo
 import {
   Heart, ExternalLink, Edit, Trash2, Star, FileText, MoreVertical, AlertTriangle
 } from 'lucide-react';
@@ -24,7 +24,7 @@ interface Tool {
   id: string;
   name: string;
   description: string | null;
-  category: any; // Alterado para any para suportar string ou objeto durante a migração
+  category: any; 
   subcategory: string | null;
   url: string;
   image_url: string | null;
@@ -57,8 +57,7 @@ export function ToolCard({
   onToggleFavorite, onEdit, onDelete, onSaveNotes, onRate, onAccess,
 }: ToolCardProps) {
   
-  // --- BLINDAGEM DE CATEGORIA ---
-  // Normaliza para string independente do que venha do banco
+  // --- BLINDAGEM DE CATEGORIA (LEITURA) ---
   const toolCategoryName = typeof tool?.category === 'string' 
     ? tool.category 
     : (tool?.category?.name || 'Geral');
@@ -67,17 +66,43 @@ export function ToolCard({
   const [showEdit, setShowEdit] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [notes, setNotes] = useState(tool?.notes || '');
+  
+  // Estado de Edição normalizado para Texto
   const [editData, setEditData] = useState({
     id: tool?.id || '', 
     name: tool?.name || '', 
     description: tool?.description || '',
     url: tool?.url || '', 
-    category: toolCategoryName, 
+    category: toolCategoryName, // Agora inicia como String
     image_url: tool?.image_url || '',
   });
 
+  // Sincroniza o estado de edição quando a ferramenta mudar
+  useEffect(() => {
+    setEditData({
+      id: tool?.id || '',
+      name: tool?.name || '',
+      description: tool?.description || '',
+      url: tool?.url || '',
+      category: toolCategoryName,
+      image_url: tool?.image_url || '',
+    });
+  }, [tool, toolCategoryName]);
+
   const handleSaveNotes = () => { onSaveNotes?.(tool?.id || '', notes); setShowNotes(false); };
-  const handleEdit = () => { if (tool) onEdit?.({ ...tool, ...editData }); setShowEdit(false); };
+  
+  const handleEdit = () => { 
+    if (tool) {
+      // Garante que estamos enviando a categoria como string no update
+      onEdit?.({ 
+        ...tool, 
+        ...editData,
+        category: editData.category // Persistência como Texto
+      }); 
+    }
+    setShowEdit(false); 
+  };
+
   const handleDelete = () => { onDelete?.(tool?.id || ''); setShowDeleteConfirm(false); };
   const handleRate = (star: number) => { onRate?.(tool?.id || '', (tool?.rating || 0) === star ? 0 : star); };
 
@@ -153,11 +178,6 @@ export function ToolCard({
                   <Star className={`w-4 h-4 ${(tool?.rating || 0) >= star ? 'text-yellow-400 fill-current' : theme === 'dark' ? 'text-slate-600' : 'text-gray-300'}`} />
                 </button>
               ))}
-              {tool?.notes && (
-                <span className={`ml-2 text-xs flex items-center gap-1 ${theme === 'dark' ? 'text-violet-400' : 'text-violet-600'}`}>
-                  <FileText className="w-3 h-3" /> Notas
-                </span>
-              )}
             </div>
           )}
         </div>
@@ -177,6 +197,7 @@ export function ToolCard({
         </div>
       </div>
 
+      {/* MODAL DE NOTAS */}
       <Dialog open={showNotes} onOpenChange={setShowNotes}>
         <DialogContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}>
           <DialogHeader>
@@ -193,51 +214,49 @@ export function ToolCard({
         </DialogContent>
       </Dialog>
 
+      {/* MODAL DE EDIÇÃO (Ajustado para Salvar Texto) */}
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
         <DialogContent className={`max-w-lg ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}`}>
           <DialogHeader>
             <DialogTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>Editar Ferramenta</DialogTitle>
-            <DialogDescription className={theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}>Modifique os dados da ferramenta.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
-            <div><Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Nome</Label>
-              <Input value={editData.name} onChange={(e) => setEditData({ ...editData, name: e.target.value })} className={theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : ''} /></div>
-            <div><Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Descrição</Label>
-              <Textarea value={editData.description} onChange={(e) => setEditData({ ...editData, description: e.target.value })} className={theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : ''} /></div>
-            <div><Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>URL</Label>
-              <Input value={editData.url} onChange={(e) => setEditData({ ...editData, url: e.target.value })} className={theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : ''} /></div>
-            <div><Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Categoria</Label>
+            <div><Label>Nome</Label><Input value={editData.name} onChange={(e) => setEditData({ ...editData, name: e.target.value })} className={theme === 'dark' ? 'bg-slate-800 text-white' : ''} /></div>
+            <div><Label>Descrição</Label><Textarea value={editData.description} onChange={(e) => setEditData({ ...editData, description: e.target.value })} className={theme === 'dark' ? 'bg-slate-800 text-white' : ''} /></div>
+            <div><Label>URL</Label><Input value={editData.url} onChange={(e) => setEditData({ ...editData, url: e.target.value })} className={theme === 'dark' ? 'bg-slate-800 text-white' : ''} /></div>
+            
+            <div><Label>Categoria</Label>
               <Select value={editData.category} onValueChange={(v) => setEditData({ ...editData, category: v })}>
-                <SelectTrigger className={theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : ''}><SelectValue /></SelectTrigger>
+                <SelectTrigger className={theme === 'dark' ? 'bg-slate-800 text-white' : ''}><SelectValue /></SelectTrigger>
                 <SelectContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : ''}>
-                  {categories.map((cat) => (<SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>))}
+                  {/* CORREÇÃO AQUI: Agora passamos cat.name no value */}
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
-              </Select></div>
-            <div><Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>URL da Imagem</Label>
-              <Input value={editData.image_url} onChange={(e) => setEditData({ ...editData, image_url: e.target.value })} placeholder="https://..." className={theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : ''} /></div>
+              </Select>
+            </div>
+
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setShowEdit(false)}>Cancelar</Button>
-              <Button onClick={handleEdit} className="bg-violet-600 hover:bg-violet-700 text-white">Salvar</Button>
+              <Button onClick={handleEdit} className="bg-violet-600 text-white">Salvar</Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* ALERT DELETE */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}>
+        <AlertDialogContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : ''}>
           <AlertDialogHeader>
-            <AlertDialogTitle className={`flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              <AlertTriangle className="w-5 h-5 text-red-500" /> Confirmar exclusão
-            </AlertDialogTitle>
-            <AlertDialogDescription className={theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}>
-              Tem certeza que deseja excluir <strong>{tool?.name}</strong>? Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>Tem certeza que deseja excluir {tool?.name}?</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className={theme === 'dark' ? 'bg-slate-800 text-white border-slate-700' : ''}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
-              <Trash2 className="w-4 h-4 mr-2" /> Excluir
-            </AlertDialogAction>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 text-white">Excluir</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
