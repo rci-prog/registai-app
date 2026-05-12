@@ -1076,18 +1076,29 @@ export function useTools() {
   // FILTRAR E PROCESSAR FERRAMENTAS (Lógica Unificada)
   // ============================================================
   const filteredTools = useMemo(() => {
-    console.log('[useTools] filteredTools recalculando...', filters);
+    console.log('[useTools] filteredTools recalculando. filters:', JSON.stringify(filters), '| total tools:', tools?.length || 0);
+    
+    if (!Array.isArray(tools)) {
+      console.error('[useTools] tools nao e array:', tools);
+      return [];
+    }
 
-    // 1. Filtro inicial com blindagem contra nulos
-    let result = (tools || []).filter((tool: any) => {
+    // DIAGNÓSTICO: verificar se existem ferramentas com categoria nula que escaparam
+    const nullCategoryTools = tools.filter((t: any) => !t || !t.category);
+    if (nullCategoryTools.length > 0) {
+      console.error('[useTools] FERRAMENTAS COM CATEGORY NULO:', nullCategoryTools.map((t: any) => ({ id: t?.id, name: t?.name, category: t?.category })));
+    }
+
+    // 1. Filtro inicial com blindagem reforçada
+    let result = tools.filter((tool: any) => {
       if (!tool || !tool.id) return false;
       return true;
     });
 
-    // 2. Filtro por Categoria
+    // 2. Filtro por Categoria (com blindagem de string)
     if (filters.category && filters.category !== 'all') {
       result = result.filter(tool => {
-        const toolCat = (tool.category || 'Geral').toLowerCase();
+        const toolCat = (typeof tool.category === 'string' ? tool.category : (tool.category?.name || 'Geral')).toLowerCase();
         const filterCat = (filters.category || '').toLowerCase();
         return toolCat === filterCat;
       });
