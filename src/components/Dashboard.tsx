@@ -377,7 +377,7 @@ export function Dashboard() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <div className="flex flex-col h-full overflow-y-auto">
+        <div className="w-80 flex flex-col h-full overflow-y-auto flex-shrink-0">
           <SidebarFilters
             categories={categories}
             selectedCategory={filters.category}
