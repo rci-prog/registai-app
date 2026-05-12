@@ -47,7 +47,7 @@ class ErrorBoundary extends Component<EBProps, EBState> {
             </pre>
             <button
               onClick={() => window.location.reload()}
-               style={{
+              style={{
                 marginTop: '1.5rem', padding: '0.75rem 1.5rem', background: '#8b5cf6',
                 color: '#fff', border: 'none', borderRadius: '0.5rem', cursor: 'pointer',
                 fontSize: '0.875rem', fontWeight: 600,
