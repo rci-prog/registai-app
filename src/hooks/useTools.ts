@@ -10,9 +10,18 @@ export function useTools(userId?: string) {
 
   const fetchTools = useCallback(async () => {
     setLoading(true);
-    // Adicionamos um select que garante que a estrutura venha correta
+    // Buscamos todas as colunas da tabela tools para garantir compatibilidade
     const { data, error } = await supabase.from('tools').select('*').order('name');
-    if (!error && data) setTools(data);
+    
+    if (!error && data) {
+      // NORMALIZAÇÃO: Garante que 'category' seja sempre uma string válida, evitando crash no frontend
+      const normalizedTools = data.map((t: any) => ({
+        ...t,
+        // Prioridade: category_id (novo FK texto) -> category (coluna antiga texto) -> 'Geral' (fallback)
+        category: t.category_id || t.category || 'Geral',
+      }));
+      setTools(normalizedTools);
+    }
     setLoading(false);
   }, []);
 
@@ -22,16 +31,23 @@ export function useTools(userId?: string) {
   }, []);
 
   const fetchUserTools = useCallback(async (uid: string) => {
-    // AQUI ESTÁ O PONTO CRÍTICO: 
-    // Garantimos que ele tente buscar a tool e a categoria vinculada
+    // PONTO CRÍTICO: Simplificado para evitar falhas de join caso a FK ainda esteja em migração
     const { data, error } = await supabase
       .from('user_tools')
-      .select('*, tool:tools(*, category:categories(*))')
+      .select('*, tool:tools(*)')
       .eq('user_id', uid);
     
     if (!error && data) {
-      // Filtramos entradas onde a 'tool' pode ter vindo nula por erro de integridade no banco
-      const validUserTools = data.filter(ut => ut.tool !== null);
+      // Blindagem adicional: normaliza a categoria dentro do objeto da ferramenta vinculada
+      const validUserTools = data
+        .filter(ut => ut.tool !== null)
+        .map((ut: any) => ({
+          ...ut,
+          tool: {
+            ...ut.tool,
+            category: ut.tool.category_id || ut.tool.category || 'Geral'
+          }
+        }));
       setUserTools(validUserTools);
     }
   }, []);
