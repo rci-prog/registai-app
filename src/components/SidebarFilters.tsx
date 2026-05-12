@@ -148,7 +148,7 @@ export function SidebarFilters({
           <Switch
             id="favorites"
             checked={favoritesOnly}
-n            onCheckedChange={handleFavoriteToggle}
+             onCheckedChange={handleFavoriteToggle}
             className="data-[state=checked]:bg-violet-600"
           />
         </div>
