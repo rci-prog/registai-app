@@ -195,7 +195,8 @@ export function SidebarFilters({
 
           {/* Category List */}
           <div className="space-y-0.5">
-            {categories.map((category) => {
+            {categories?.map((category) => {
+            if (!category || !category.id) return null;
               const isSelected = selectedCategory === category.id;
               const count = categoryCounts[category.id] || 0;
 
