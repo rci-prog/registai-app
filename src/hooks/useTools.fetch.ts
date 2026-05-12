@@ -1072,21 +1072,22 @@ export function useTools() {
   const filteredTools = useMemo(() => {
     console.log('[useTools] filteredTools recalculando. filters:', JSON.stringify(filters), '| total tools:', tools.length);
     
-    let result = [...tools];
+    // Filtra apenas ferramentas que realmente existem (não nulas)
+    let result = tools.filter(t => t !== null && t !== undefined);
 
-    // 1. Filtro por Categoria
+    // 1. Filtro por Categoria (Com trava de segurança)
     if (filters.category) {
       result = result.filter(tool => 
-        tool.category?.toLowerCase() === filters.category?.toLowerCase()
+        tool?.category?.toLowerCase() === filters.category?.toLowerCase()
       );
     }
 
-    // 2. Filtro por Busca (Search)
+    // 2. Filtro por Busca (Com trava de segurança)
     if (filters.search) {
       const query = filters.search.toLowerCase();
       result = result.filter(tool => 
-        tool.name?.toLowerCase().includes(query) || 
-        tool.description?.toLowerCase().includes(query)
+        tool?.name?.toLowerCase().includes(query) || 
+        tool?.description?.toLowerCase().includes(query)
       );
     }
 
@@ -1098,8 +1099,8 @@ export function useTools() {
       });
     }
 
-    // Mapear dados do usuário (Favoritos, Notas, etc.)
-    const mapped = result.map((tool: any) => {
+    // Mapeamento final com verificação
+    return result.map((tool: any) => {
       const userData = userToolsData.get(tool.id);
       return {
         ...tool,
@@ -1108,9 +1109,6 @@ export function useTools() {
         rating: userData?.rating || null,
       };
     });
-
-    console.log('[useTools] filteredTools resultado:', mapped.length, 'ferramentas');
-    return mapped;
   }, [tools, filters, userToolsData, currentUser?.id]);
   // ============================================================
   // LIMPAR HISTORICO DE ACESSOS
