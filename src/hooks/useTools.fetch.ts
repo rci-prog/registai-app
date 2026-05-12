@@ -1147,51 +1147,17 @@ export function useTools() {
     tools: filteredTools,
     allTools: tools,
     categories,
-    clickData: Array.from(clickData.entries()).map(([tool_id, count]) => ({ tool_id, count })),
-    budget: { 
-      monthly: budget?.monthly_limit ?? 0, 
-      yearly: budget?.yearly_limit ?? 0 
-    } as any, 
-    subscriptions,
-    projects,
-    filters,
-    isLoading,
+    userProjects,
+    userBudget,
+    userSubscriptions,
+    stats,
+    loading,
     error,
-    toggleFavorite,
-    saveNotes,
-    saveRating,
-    addTool,
-    editTool,
-    deleteTool,
-    addCategory,
-    editCategory,
-    deleteCategory,
-    recordAccess,
-    resetClicks,
-    setUserBudget,
-    addSubscription,
-    deleteSubscription: (async (id: string) => await (deleteSubscription as any)(id)) as any, 
-    confirmSubscriptionPayment,
-    addProject,
-    deleteProject,
-    const setCategory = useCallback((c: string | null) => {
-    console.log('[useTools] setCategory chamado:', c);
-    setFilters(p => ({ ...p, category: c, subcategory: null }));
-  }, []);
-    const setSearch = useCallback((s: string) => {
-    console.log('[useTools] setSearch chamado:', s);
-    setFilters(p => ({ ...p, search: s }));
-  }, []);
-    const setFavoritesOnly = useCallback((f: boolean) => {
-    console.log('[useTools] setFavoritesOnly chamado:', f);
-    setFilters(p => ({ ...p, favoritesOnly: f }));
-  }, []);
-    const clearFilters = useCallback(() => {
-    console.log('[useTools] clearFilters chamado');
-    setFilters({ category: null, subcategory: null, search: '', favoritesOnly: false });
-  }, []);
-  
-  return {
+    addSubscription: (data: any) => supabaseInsert('user_subscriptions', data),
+    updateSubscription: (id: string, data: any) => supabaseUpdate('user_subscriptions', id, data),
+    deleteSubscription: (id: string) => supabaseDelete('user_subscriptions', id),
+    addProject: (data: any) => supabaseInsert('user_projects', data),
+    deleteProject: (id: string) => supabaseDelete('user_projects', id),
     setCategory,
     setSearch,
     setFavoritesOnly,
