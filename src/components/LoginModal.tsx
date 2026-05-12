@@ -12,7 +12,7 @@ import { LogIn, UserPlus, Loader2 } from 'lucide-react';
 interface LoginModalProps {
   open: boolean;
   onClose: () => void;
-  onRegisterSuccess?: () => void;
+  initialError?: string | null; // Adicione esta linha
 }
 
 export function LoginModal({ open, onClose, onRegisterSuccess }: LoginModalProps) {
