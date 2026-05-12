@@ -11,7 +11,7 @@ interface ShareToolsModalProps {
   isOpen: boolean;
   onClose: () => void;
   theme: 'light' | 'dark';
-  tools: any[]; // Definido como array para evitar erros de map
+  tools: any[]; 
   currentUser: any; 
 }
 
@@ -70,9 +70,12 @@ export function ShareToolsModal({ isOpen, onClose, theme, tools = [] }: ShareToo
           </div>
 
           <div className={`max-h-48 overflow-y-auto space-y-2 rounded-lg p-2 border ${theme === 'dark' ? 'border-slate-800 bg-slate-950/50' : 'border-gray-100 bg-gray-50/50'}`}>
-            {tools.length > 0 ? (
+            {tools && tools.length > 0 ? (
               tools.map((tool: any) => {
-                // Normalização da categoria para evitar crash (mesma lógica do ToolCard)
+                // CORREÇÃO: Blindagem extra para evitar crash se 'tool' for nulo
+                if (!tool) return null;
+
+                // Normalização da categoria (Igual ao ToolCard)
                 const catName = typeof tool.category === 'string' 
                   ? tool.category 
                   : (tool.category?.name || 'Geral');
@@ -89,7 +92,7 @@ export function ShareToolsModal({ isOpen, onClose, theme, tools = [] }: ShareToo
                       <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-200' : 'text-gray-700'}`}>
                         {tool.name}
                       </span>
-                      <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider">
                         {catName}
                       </span>
                     </div>
