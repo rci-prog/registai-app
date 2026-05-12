@@ -1101,9 +1101,13 @@ export function useTools() {
 
     // Mapeamento final com verificação
     return result.map((tool: any) => {
+      // Se por algum motivo o objeto tool for inválido aqui, retornamos um objeto vazio seguro
+      if (!tool || !tool.id) return { id: 'temp', name: '', category: '' };
+
       const userData = userToolsData.get(tool.id);
       return {
         ...tool,
+        category: tool.category || '', // Garante que category NUNCA seja undefined
         isFavorite: userData?.is_favorite || false,
         notes: userData?.personal_notes || null,
         rating: userData?.rating || null,
