@@ -1101,13 +1101,15 @@ export function useTools() {
 
     // Mapeamento final com verificação
     return result.map((tool: any) => {
-      // Se por algum motivo o objeto tool for inválido aqui, retornamos um objeto vazio seguro
-      if (!tool || !tool.id) return { id: 'temp', name: '', category: '' };
+      // Se tool for indefinido por erro de sincronismo, retorna objeto seguro
+      if (!tool) return { id: 'error', name: 'Erro de carga', category: '' };
 
       const userData = userToolsData.get(tool.id);
+      
       return {
         ...tool,
-        category: tool.category || '', // Garante que category NUNCA seja undefined
+        // Garante que a propriedade category SEMPRE exista como string
+        category: tool.category || '', 
         isFavorite: userData?.is_favorite || false,
         notes: userData?.personal_notes || null,
         rating: userData?.rating || null,
