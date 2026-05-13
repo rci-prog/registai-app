@@ -1,60 +1,114 @@
-import { DollarSign, TrendingUp, AlertTriangle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useMemo } from 'react';
+import { Gauge } from 'lucide-react';
+
+interface Subscription {
+  id: string;
+  name: string;
+  price: number;
+  type: 'monthly' | 'yearly' | 'one_time';
+  payments_made?: number;
+}
 
 interface BudgetGaugesProps {
-  subscriptions: any[];
-  budget: { monthly: number; yearly: number };
-  theme: string;
+  subscriptions: Subscription[];
+  budget: { monthly_limit: number; yearly_limit: number } | null;
+  theme: 'light' | 'dark';
   onSetBudget: () => void;
 }
 
 export function BudgetGauges({ subscriptions, budget, theme, onSetBudget }: BudgetGaugesProps) {
-  // MODIFICAÇÃO PASSO 3: Blindagem para garantir que subscriptions seja um array
-  const safeSubscriptions = Array.isArray(subscriptions) ? subscriptions : [];
-  
-  // MODIFICAÇÃO PASSO 3: Uso do safeSubscriptions para evitar erro .reduce
-  const monthlyCost = safeSubscriptions.reduce((sum: number, s: any) => sum + (s.cost || 0), 0);
-  
-  const monthlyLimit = (budget && budget.monthly) ? budget.monthly : 1000;
-  const monthlyPercent = Math.min((monthlyCost / monthlyLimit) * 100, 100);
-  const isOverBudget = monthlyCost > monthlyLimit;
+  console.log('[BudgetGauges] RENDER subscriptions:', subscriptions?.length);
+  const { monthlySpent, yearlySpent } = useMemo(() => {
+    const subs = Array.isArray(subscriptions) ? subscriptions : [];
+    const monthly = subs
+      .filter(s => s.type === 'monthly')
+      .reduce((sum, s) => sum + s.price, 0);
+
+    const yearly = subs.reduce((sum, s) => {
+      if (s.type === 'monthly') {
+        return sum + (s.price * (s.payments_made || 1));
+      }
+      return sum + s.price;
+    }, 0);
+
+    return { monthlySpent: monthly, yearlySpent: yearly };
+  }, [subscriptions]);
+
+  const monthlyLimit = budget?.monthly_limit || 0;
+  const yearlyLimit = budget?.yearly_limit || 0;
 
   return (
-    <div className={`p-4 border-t ${theme === 'dark' ? 'border-slate-800' : 'border-gray-200'}`}>
-      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-        <DollarSign className="w-4 h-4" /> Orcamento
-      </h3>
-      
-      <div className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-slate-900' : 'bg-gray-50'}`}>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-slate-400">Mensal</span>
-          <span className={`text-sm font-medium ${isOverBudget ? 'text-red-400' : 'text-emerald-400'}`}>
-            R$ {monthlyCost.toFixed(2)} / R$ {monthlyLimit.toFixed(2)}
-          </span>
-        </div>
-        <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-          <div 
-            className={`h-full rounded-full transition-all ${isOverBudget ? 'bg-red-500' : 'bg-emerald-500'}`}
-            style={{ width: `${monthlyPercent}%` }}
-          />
-        </div>
-        {isOverBudget && (
-          <div className="flex items-center gap-1 mt-2 text-red-400 text-[11px]">
-            <AlertTriangle className="w-3 h-3" />
-            <span>Acima do limite!</span>
-          </div>
-        )}
+    <div className="mt-4 mx-3 rounded-xl border p-4 backdrop-blur-sm bg-slate-900/60 border-slate-800/60">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold flex items-center gap-2 text-white">
+          <Gauge className="w-4 h-4 text-violet-500" />
+          ORÇAMENTO
+        </h3>
+        <button
+          onClick={onSetBudget}
+          className="text-xs px-3 py-1 rounded-lg transition-colors bg-slate-800 hover:bg-slate-700 text-slate-300"
+        >
+          Definir
+        </button>
       </div>
 
-      <Button 
-        variant="outline" 
-        size="sm" 
-        onClick={onSetBudget}
-        className="w-full mt-2 text-xs border-slate-700 text-slate-400 hover:text-white"
-      >
-        <TrendingUp className="w-3 h-3 mr-1" />
-        Definir orcamento
-      </Button>
+      <div className="flex items-center justify-around gap-1">
+        <GaugeSVG value={monthlySpent} max={monthlyLimit} label="MENSAL" />
+        <div className="w-px h-14 bg-slate-700" />
+        <GaugeSVG value={yearlySpent} max={yearlyLimit} label="ANUAL" />
+      </div>
+    </div>
+  );
+}
+
+function GaugeSVG({ value, max, label }: { value: number; max: number; label: string }) {
+  const percentage = max > 0 ? Math.min((value / max) * 100, 100) : 0;
+
+  const getColor = (pct: number) => {
+    if (pct >= 100) return '#ef4444';
+    if (pct >= 80) return '#f59e0b';
+    if (pct >= 60) return '#eab308';
+    return '#8b5cf6';
+  };
+  const color = getColor(percentage);
+
+  const rotation = 90 + (percentage / 100) * 180;
+
+  return (
+    <div className="flex flex-col items-center">
+      <svg viewBox="0 0 110 70" className="w-24 h-auto">
+        <path
+          d="M 12 65 A 43 43 0 0 1 98 65"
+          fill="none"
+          stroke="#334155"
+          strokeWidth="6"
+          strokeLinecap="round"
+        />
+        <path
+          d="M 12 65 A 43 43 0 0 1 98 65"
+          fill="none"
+          stroke={color}
+          strokeWidth="6"
+          strokeLinecap="round"
+          strokeDasharray={`${(percentage / 100) * 135} 200`}
+        />
+        <circle cx="55" cy="65" r="3" fill="#94a3b8" />
+        <line
+          x1="55"
+          y1="65"
+          x2="55"
+          y2="97"
+          stroke="#94a3b8"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          transform={`rotate(${rotation}, 55, 65)`}
+          className="transition-all duration-700"
+        />
+      </svg>
+      <p className="text-[10px] font-medium mt-1 text-slate-400">{label}</p>
+      <p className="text-xs font-bold text-white">
+        R$ {value.toLocaleString('pt-BR')} <span className="text-[10px] font-normal text-slate-500">/ R$ {max.toLocaleString('pt-BR')}</span>
+      </p>
     </div>
   );
 }
