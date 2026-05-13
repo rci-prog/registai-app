@@ -84,13 +84,12 @@ export function Dashboard() {
     refreshTools,
   } = useTools();
   
-  const { currentUser, theme, isAdmin, profile } = useAuth();
+  const { currentUser, theme, isAdmin, profile, updateProfile, deleteAccount, blockMessage } = useAuth();
   
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
 
-  const [blockMessage] = useState<string | null>(null);
   // Verificar se usuario do cache ainda e valido (profile existe e nao esta bloqueado)
   // Usa fetch direto com API key para BYPASS RLS — le valor real do is_blocked
   const SUPABASE_URL = 'https://cmfgirvgnexkcomhcosm.supabase.co';
@@ -210,36 +209,35 @@ export function Dashboard() {
   // Calcular contagem por categoria (case-insensitive, mapeia por id e por nome)
   // Usa 'allTools' (todas as ferramentas disponiveis no Supabase)
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    
-    // Inicializar com 0 para todas as categorias conhecidas
-    categories.forEach((cat: any) => {
-      counts[cat.name] = 0;
-    });
-
-    // 1. Filtramos apenas ferramentas válidas antes de contar
-    const validTools = (allTools || []).filter((t: any) => t && (t.category || (t.category as any)?.name));
-
-    validTools.forEach((tool: any) => {
-      // 2. Normalização da categoria (Trata se for String ou Objeto)
-      const rawCat = typeof tool.category === 'string' 
-        ? tool.category 
-        : (tool.category?.name || 'Geral');
-
-      const toolCatLower = rawCat.toLowerCase();
-
-      // 3. Busca a categoria correspondente nas suas categorias cadastradas
-      const matchingCat = categories.find((cat: any) => 
-        (cat.id || '').toLowerCase() === toolCatLower || 
-        (cat.name || '').toLowerCase() === toolCatLower
-      );
-
-      // 4. Soma no contador do gráfico
-      const finalKey = matchingCat ? matchingCat.name : 'Geral';
-      counts[finalKey] = (counts[finalKey] || 0) + 1;
-    });
-
-    return counts;
+    try {
+      const counts: Record<string, number> = {};
+      // Inicializar com 0 para todas as categorias
+      categories.forEach((cat: any) => {
+        counts[cat.id] = 0;
+        counts[cat.name] = 0;
+      });
+      // Contar TODAS as ferramentas disponiveis (nao so as filtradas)
+      // BLINDAGEM: pular elementos undefined/null no array
+      (allTools || []).forEach((tool: any) => {
+        if (!tool) {
+          console.warn('[Dashboard] categoryCounts: ferramenta undefined no array');
+          return;
+        }
+        const toolCatLower = (tool.category || 'Geral').toLowerCase();
+        // Encontrar a categoria correspondente (case-insensitive)
+        const matchingCat = categories.find((cat: any) =>
+          cat.id.toLowerCase() === toolCatLower ||
+          cat.name.toLowerCase() === toolCatLower
+        );
+        if (matchingCat) {
+          counts[matchingCat.id] = (counts[matchingCat.id] || 0) + 1;
+        }
+      });
+      return counts;
+    } catch (e: any) {
+      console.error('[Dashboard] ERRO em categoryCounts:', e.message, e.stack);
+      return {};
+    }
   }, [allTools, categories]);
 
   const handleAddTool = async () => {
@@ -319,7 +317,7 @@ export function Dashboard() {
     }
   };
 
-  // ======= PROTECAO DE ROTA =======
+  // ======= PROTEÇÃO DE ROTA =======
   // Se não estiver autenticado, mostra APENAS a tela de login
   if (!currentUser) {
     // ============================================================
@@ -416,7 +414,7 @@ export function Dashboard() {
             onReset={resetClicks}
           />
 
-          {/* Orcamento - velocimetros */}
+          {/* Orçamento - velocímetros */}
           <BudgetGauges
             subscriptions={subscriptions}
             budget={budget}
@@ -481,7 +479,7 @@ export function Dashboard() {
             <TransferNotification theme={theme} currentUser={currentUser} />
           )}
 
-          {/* CORRECAO 3: Loading Guard — impede renderizacao prematura */}
+          {/* Loading Guard — impede renderização prematura */}
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
@@ -588,31 +586,32 @@ export function Dashboard() {
                   ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'
                   : 'space-y-4'
               }>
+                {/* BLINDAGEM: filtrar ferramentas sem category para nao crashar ToolCard */}
                 {(() => {
-  const invalidTools = tools.filter((t: any) => !t || !t.id || t.category === undefined || t.category === null);
-  if (invalidTools.length > 0) {
-    console.error('[Dashboard] FERRAMENTAS SEM CATEGORY (nao renderizadas):', invalidTools.map((t: any) => ({ id: t?.id, name: t?.name, category: t?.category })));
-  }
-  return null;
-})()}
-{tools
-  .filter((t: any) => t && t.id && t.category !== undefined && t.category !== null)
-  .map((tool: any) => (
-    <ToolCard
-      key={tool.id}
-      tool={tool}
-      isLoggedIn={!!currentUser}
-      isAdmin={!!currentUser}
-      theme={theme}
-      categories={categories}
-      onToggleFavorite={toggleFavorite}
-      onSaveNotes={saveNotes}
-      onRate={saveRating}
-      onEdit={editTool}
-      onDelete={deleteTool}
-      onAccess={recordAccess}
-    />
-  ))}
+                  const invalidTools = tools.filter((t: any) => !t || !t.id || t.category === undefined || t.category === null);
+                  if (invalidTools.length > 0) {
+                    console.error('[Dashboard] FERRAMENTAS SEM CATEGORY (nao renderizadas):', invalidTools.map((t: any) => ({ id: t?.id, name: t?.name, category: t?.category })));
+                  }
+                  return null;
+                })()}
+                {tools
+                  .filter((t: any) => t && t.id && t.category !== undefined && t.category !== null)
+                  .map((tool: any) => (
+                    <ToolCard
+                      key={tool.id}
+                      tool={tool}
+                      isLoggedIn={!!currentUser}
+                      isAdmin={!!currentUser}
+                      theme={theme}
+                      categories={categories}
+                      onToggleFavorite={toggleFavorite}
+                      onSaveNotes={saveNotes}
+                      onRate={saveRating}
+                      onEdit={editTool}
+                      onDelete={deleteTool}
+                      onAccess={recordAccess}
+                    />
+                  ))}
               </div>
             )}
           </div>
@@ -705,7 +704,7 @@ export function Dashboard() {
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : ''}>
-                  {categories.map((cat: any) => (
+                  {categories.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id}>
                       {cat.name}
                     </SelectItem>
@@ -773,7 +772,7 @@ export function Dashboard() {
             {/* Categories List */}
             <div className="space-y-2 max-h-64 overflow-y-auto">
               <Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Categorias Existentes</Label>
-              {categories.map((cat: any) => (
+              {categories.map((cat) => (
                 <div 
                   key={cat.id} 
                   className={`flex items-center justify-between p-3 rounded-lg ${theme === 'dark' ? 'bg-slate-800' : 'bg-gray-50'}`}
@@ -912,19 +911,14 @@ export function Dashboard() {
         </DialogContent>
       </Dialog>
 
- {/* Profile Modal */}
+      {/* Profile Modal */}
       <ProfileModal
         open={showProfile}
         onClose={() => setShowProfile(false)}
-        profile={profile as any}
+        profile={profile ? { id: profile.id, email: profile.email, name: profile.name, avatar: profile.avatar, created_at: profile.created_at, username: profile.username } : null}
         theme={theme}
-        onUpdate={async () => {
-          return { success: true }
-        }}
-        onDeleteAccount={async () => {
-          console.log("Excluindo conta")
-          return { success: true }
-        }}
+        onUpdate={updateProfile}
+        onDeleteAccount={deleteAccount}
       />
 
       {/* Admin Panel */}
@@ -955,7 +949,6 @@ export function Dashboard() {
       )}
 
       {/* Regis - Assistente de IA */}
-      {/* CORRECAO 2: category fallback 'Geral' para evitar undefined */}
       <RegisChat
         tools={allTools.map((t: any) => ({ id: t.id, name: t.name, description: t.description, category: t.category || 'Geral' }))}
         theme={theme}
