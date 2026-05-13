@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Heart, ExternalLink, Edit, Trash2, Star, FileText, MoreVertical
-} from 'lucide-react';
+} from 'lucide-center';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -187,8 +187,18 @@ export function ToolCard({
               tool?.notes ? 'text-violet-500 bg-violet-500/10' : theme === 'dark' ? 'text-slate-500 hover:text-violet-400 hover:bg-violet-500/10' : 'text-gray-400 hover:text-violet-500 hover:bg-violet-50'
             }`} title="Notas"><FileText className="w-4 h-4" /></button>
           </div>
-          <a href={tool?.url} target="_blank" rel="noopener noreferrer" onClick={() => onAccess?.(tool?.id || '')}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-violet-600 hover:bg-violet-700 text-white transition-colors">
+          
+          {/* Botão Acessar - Modificado para registrar o clique via onAccess */}
+          <a 
+            href={tool?.url} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            onClick={() => {
+              console.log('[ToolCard] Clique registrado para:', tool?.id);
+              onAccess?.(tool?.id || '');
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-violet-600 hover:bg-violet-700 text-white transition-colors"
+          >
             Acessar <ExternalLink className="w-4 h-4" />
           </a>
         </div>
