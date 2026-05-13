@@ -34,7 +34,7 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
 
   return (
     <header className="w-full border-b border-slate-800/60 bg-slate-900/80 backdrop-blur-sm">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between relative">
         {/* Logo registAI */}
         <div className="flex items-center gap-3">
           <svg
@@ -67,9 +67,23 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
             <h1 className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
               registAI
             </h1>
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Catálogo Inteligente de IA</p>
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Catalogo Inteligente de IA</p>
           </div>
         </div>
+
+        {/* CENTRO — Botao Painel ADM (apenas admin) */}
+        {isAdmin && (
+          <div className="absolute left-1/2 -translate-x-1/2 hidden sm:block">
+            <Button
+              size="sm"
+              onClick={onAdmin}
+              className="bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80 hover:from-violet-600 hover:to-fuchsia-600 text-white text-xs px-3 py-1 h-8 border border-violet-500/30"
+            >
+              <Shield className="w-3.5 h-3.5 mr-1.5" />
+              Painel ADM
+            </Button>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex items-center gap-2">
