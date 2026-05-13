@@ -9,7 +9,12 @@ interface BudgetGaugesProps {
 }
 
 export function BudgetGauges({ subscriptions, budget, theme, onSetBudget }: BudgetGaugesProps) {
-  const monthlyCost = subscriptions.reduce((sum: number, s: any) => sum + (s.cost || 0), 0);
+  // MODIFICAÇÃO PASSO 3: Blindagem para garantir que subscriptions seja um array
+  const safeSubscriptions = Array.isArray(subscriptions) ? subscriptions : [];
+  
+  // MODIFICAÇÃO PASSO 3: Uso do safeSubscriptions para evitar erro .reduce
+  const monthlyCost = safeSubscriptions.reduce((sum: number, s: any) => sum + (s.cost || 0), 0);
+  
   const monthlyLimit = budget.monthly || 1000;
   const monthlyPercent = Math.min((monthlyCost / monthlyLimit) * 100, 100);
   const isOverBudget = monthlyCost > monthlyLimit;
