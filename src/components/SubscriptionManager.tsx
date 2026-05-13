@@ -101,29 +101,32 @@ export function SubscriptionManager({ subscriptions, theme, onAdd, onDelete, onC
     expiry_date: '',
   });
   
-  // Calcular totais
-  const totalMonthly = subscriptions
+  // ============================================================
+  // Calcular totais — BLINDAGEM: garantir que subscriptions e array
+  // ============================================================
+  const subs = Array.isArray(subscriptions) ? subscriptions : [];
+  
+  const totalMonthly = subs
     .filter(s => s.type === 'monthly')
     .reduce((sum, s) => sum + s.price, 0);
-  // Total Anual: soma TUDO (unica + mensal*parcelasPagas + anual)
-  const grandTotal = subscriptions.reduce((sum, s) => {
+  
+  const grandTotal = subs.reduce((sum, s) => {
     if (s.type === 'monthly') {
       return sum + (s.price * (s.payments_made || 1));
     }
     return sum + s.price;
   }, 0);
   
-  // TOTAL GASTO — soma de (price × payments_made) para todas as assinaturas
-  const totalGasto = subscriptions.reduce((sum, s) => {
+  const totalGasto = subs.reduce((sum, s) => {
     const payments = s.payments_made || (s.type === 'one_time' ? 1 : 1);
     return sum + (s.price * payments);
   }, 0);
   
   // Detectar assinaturas vencendo em breve
   useEffect(() => {
-    const expiring = subscriptions.filter(s => isExpiringSoon(s.expiry_date));
+    const expiring = subs.filter(s => isExpiringSoon(s.expiry_date));
     setExpiryAlerts(expiring);
-  }, [subscriptions]);
+  }, [subs]);
   
   const handleAdd = () => {
     if (!formData.name || !formData.price) {
@@ -224,7 +227,7 @@ export function SubscriptionManager({ subscriptions, theme, onAdd, onDelete, onC
             <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
               theme === 'dark' ? 'bg-slate-800 text-slate-400' : 'bg-gray-100 text-gray-500'
             }`}>
-              {subscriptions.length}
+              {subs.length}
             </span>
           </div>
           <Button
@@ -264,7 +267,7 @@ export function SubscriptionManager({ subscriptions, theme, onAdd, onDelete, onC
         
         {/* Lista */}
         <div className="space-y-1">
-          {subscriptions.map((sub) => (
+          {subs.map((sub) => (
             <div key={sub.id}>
               <button
                 onClick={() => toggleExpand(sub.id)}
@@ -360,7 +363,7 @@ export function SubscriptionManager({ subscriptions, theme, onAdd, onDelete, onC
             </div>
           ))}
           
-          {subscriptions.length === 0 && (
+          {subs.length === 0 && (
             <p className={`text-[11px] text-center py-3 ${theme === 'dark' ? 'text-slate-500' : 'text-gray-400'}`}>
               Nenhuma assinatura cadastrada
             </p>
@@ -368,7 +371,7 @@ export function SubscriptionManager({ subscriptions, theme, onAdd, onDelete, onC
         </div>
         
         {/* Totalizador */}
-        {subscriptions.length > 0 && (
+        {subs.length > 0 && (
           <div className={`mt-3 pt-3 border-t ${
             theme === 'dark' ? 'border-slate-800' : 'border-gray-200'
           }`}>
