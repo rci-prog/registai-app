@@ -176,28 +176,52 @@ export function saveAuth(user: any) {
 
 export function getAuth() {
   try {
+    // 1. Primeiro tentar nosso formato custom
     const data = localStorage.getItem(AUTH_KEY);
     if (data) {
-      return JSON.parse(data);
+      const user = JSON.parse(data);
+      console.log('[getAuth] Usuário encontrado:', user?.email);
+      return user;
     }
     
+    // 2. Fallback para formato sb-session
     const sessionData = localStorage.getItem(SESSION_KEY);
     if (sessionData) {
       const session = JSON.parse(sessionData);
       if (session?.user) {
-        return {
+        const user = {
           id: session.user.id,
           email: session.user.email,
           name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
           avatar: session.user.user_metadata?.avatar_url || '',
           role: 'user',
         };
+        console.log('[getAuth] Usuário encontrado (session):', user?.email);
+        return user;
+      }
+    }
+
+    // 3. NOVO: Fallback para sessão OAuth do Supabase
+    const sbSessionData = localStorage.getItem('sb-cmfgirvgnexkcomhcosm-auth-token');
+    if (sbSessionData) {
+      const session = JSON.parse(sbSessionData);
+      if (session?.user) {
+        const user = {
+          id: session.user.id,
+          email: session.user.email,
+          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+          avatar: session.user.user_metadata?.avatar_url || '',
+          role: 'user',
+        };
+        console.log('[getAuth] Usuário encontrado (Supabase OAuth):', user?.email);
+        return user;
       }
     }
   } catch (e) {
-    console.error('[getAuth] Erro:', e);
+    console.error('[getAuth] Erro ao ler auth:', e);
   }
   
+  console.log('[getAuth] Nenhum usuário encontrado');
   return null;
 }
 
