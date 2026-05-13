@@ -15,7 +15,7 @@ interface AuthContextType {
   currentUser: AuthUser | null;
   isAdmin: boolean;
   isLoading: boolean;
-  theme: 'light' | 'dark';
+  theme: 'dark';
   profile: Profile | null;
   login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
   loginWithGoogle: () => Promise<{ success: boolean; message: string }>;
@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const theme = 'dark';
   const [profile, setProfile] = useState<Profile | null>(null);
   const [blockMessage, setBlockMessage] = useState<string | null>(null);
 
@@ -84,7 +84,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (profileData) {
         setProfile(profileData);
-        setTheme(profileData.theme || 'dark');
 
         if (profileData.is_blocked) {
           setBlockMessage('Sua conta foi suspensa. Entre em contato com o suporte em suporte@registai.com.br');
@@ -226,14 +225,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [currentUser]);
 
   const toggleTheme = useCallback(() => {
-    setTheme((prev) => {
-      const newTheme = prev === 'light' ? 'dark' : 'light';
-      if (currentUser?.id) {
-        supabase.from('profiles').update({ theme: newTheme }).eq('id', currentUser.id);
-      }
-      return newTheme;
-    });
-  }, [currentUser]);
+  console.log('CyberDash: Tema fixo em Dark Mode.');
+}, []);
 
   return (
     <AuthContext.Provider
