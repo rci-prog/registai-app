@@ -1134,9 +1134,7 @@ export function useTools() {
           rating: userData?.rating || null,
         };
       });
-    }).filter(Boolean);
-
-  }, [tools, filters, userToolsData]);
+  }, [result, userToolsData]);
   // ============================================================
   // LIMPAR HISTORICO DE ACESSOS
   // ============================================================
