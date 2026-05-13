@@ -83,7 +83,7 @@ export function TransferNotification({ theme, currentUser }: TransferNotificatio
       } else if (ins > 0) {
         msg = `${ins} ferramenta(s) adicionada(s) ao seu perfil!`;
       } else {
-        msg = `Você ja possui ${ex} ferramenta(s) deste pacote. Nenhuma alteracao necessaria.`;
+        msg = `Voce ja possui ${ex} ferramenta(s) deste pacote. Nenhuma alteracao necessaria.`;
       }
       setResult({ success: true, msg });
       setTimeout(() => {
@@ -103,6 +103,17 @@ export function TransferNotification({ theme, currentUser }: TransferNotificatio
     if (res.success) {
       setSelectedTransfer(null);
       setResult(null);
+    }
+  };
+
+  // CORRECAO: handler seguro para abrir modal — verifica se transfers tem dados
+  const handleOpenModal = () => {
+    if (transfers.length > 0) {
+      setSelectedTransfer(transfers[0]);
+      setResult(null);
+    } else {
+      console.warn('[TransferNotification] transfers vazio, recarregando...');
+      if (currentUser?.id) fetchPendingTransfers(currentUser.id);
     }
   };
 
@@ -127,7 +138,7 @@ export function TransferNotification({ theme, currentUser }: TransferNotificatio
         </div>
         <Button
           size="sm"
-          onClick={() => setSelectedTransfer(transfers[0])}
+          onClick={handleOpenModal}
           className="bg-violet-600 hover:bg-violet-700 text-white"
         >
           Ver <ArrowRight className="w-3.5 h-3.5 ml-1" />
