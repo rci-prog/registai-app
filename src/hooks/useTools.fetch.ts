@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { getAuth, supabase } from '@/lib/supabase-simple';
 import type { FilterState } from '@/types';
 import { categories as defaultCategories } from '@/data/tools';
 
