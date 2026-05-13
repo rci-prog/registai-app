@@ -1,16 +1,8 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { FilterState } from '@/types';
-// import { categories as defaultCategories } from '@/data/tools';
+import { categories as defaultCategories } from '@/data/tools';
 
-const defaultCategories = [
-  'Geral',
-  'IA',
-  'Desenvolvimento',
-  'Segurança',
-  'Design',
-  'Marketing'
-];
 // ============================================================
 // CONFIG
 // ============================================================
