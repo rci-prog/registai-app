@@ -1,14 +1,7 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { supabase } from '@/lib/supabase';
-
-const defaultCategories: any[] = [];
-
-export interface FilterState {
-  category: string | null;
-  subcategory: string | null;
-  search: string;
-  favoritesOnly: boolean;
-}
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { getAuth } from '@/lib/supabase-simple';
+import type { FilterState } from '@/types';
+import { categories as defaultCategories } from '@/data/tools';
 
 // ============================================================
 // CONFIG
@@ -231,20 +224,9 @@ export function useTools() {
     favoritesOnly: false,
   });
 
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const currentUser = getAuth();
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setCurrentUser(data.user);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setCurrentUser(session?.user || null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
+  // Estados de budget e subscriptions
   const [budget, setBudget] = useState<{ monthly_limit: number; yearly_limit: number } | null>(null);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
@@ -294,7 +276,7 @@ export function useTools() {
         const data = await res.json();
         console.log('[useTools] Subscriptions received:', data?.length || 0);
         setSubscriptions(data || []);
-       } else {
+      } else {
         const text = await res.text();
         console.error('[useTools] Subscriptions fetch failed:', res.status, text);
       }
@@ -360,7 +342,12 @@ export function useTools() {
       } else {
         const toolsData = await toolsResponse.json();
         console.log('[useTools] Tools received:', toolsData?.length || 0);
-        setTools(toolsData || []);
+        // BLINDAGEM: normalizar category para string, nunca null/undefined
+        const normalizedTools = (toolsData || []).map((t: any) => ({
+          ...t,
+          category: t.category || 'Geral',
+        }));
+        setTools(normalizedTools);
       }
 
       console.log('[useTools] [STEP 2/4] Fetching user_tools for user:', currentUser.id);
@@ -643,25 +630,27 @@ export function useTools() {
       return { success: false, message: 'Voce precisa estar logado' };
     }
 
-    try {
-      // 5ª CORREÇÃO: Blindagem de categoria antes de criar o objeto
+    // BLINDAGEM: garantir que category seja sempre string (nunca objeto)
     let categoryValue = toolData.category;
     if (typeof categoryValue === 'object' && categoryValue !== null) {
+      console.warn('[useTools] category era objeto, convertendo para string:', categoryValue);
       categoryValue = categoryValue.name || categoryValue.id || 'Geral';
     }
+    categoryValue = (categoryValue || 'Geral').toString().trim();
 
-    const newTool = {
-      name: toolData.name,
-      description: toolData.description || null,
-      url: toolData.url,
-      category: (categoryValue || 'Geral').toString().trim(), // Aqui entra o valor blindado
-      subcategory: toolData.subcategory || null,
-      image_url: toolData.image_url || null,
-      created_by: currentUser.id,
-      admin_id: currentUser.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    try {
+      const newTool = {
+        name: toolData.name,
+        description: toolData.description || null,
+        url: toolData.url,
+        category: categoryValue,
+        subcategory: toolData.subcategory || null,
+        image_url: toolData.image_url || null,
+        created_by: currentUser.id,
+        admin_id: currentUser.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
       const result = await supabaseInsert('tools', newTool);
       console.log('[useTools] SALVO - Ferramenta criada');
@@ -691,12 +680,20 @@ export function useTools() {
       return { success: false, message: 'Voce precisa estar logado' };
     }
 
+    // BLINDAGEM: garantir que category seja sempre string
+    let categoryValue = toolData.category;
+    if (typeof categoryValue === 'object' && categoryValue !== null) {
+      console.warn('[useTools] editTool: category era objeto, convertendo:', categoryValue);
+      categoryValue = categoryValue.name || categoryValue.id || 'Geral';
+    }
+    categoryValue = (categoryValue || 'Geral').toString().trim();
+
     try {
       await supabaseUpdate('tools', toolData.id, {
         name: toolData.name,
         description: toolData.description || null,
         url: toolData.url,
-        category: toolData.category,
+        category: categoryValue,
         image_url: toolData.image_url || null,
         updated_at: new Date().toISOString(),
       });
@@ -1072,60 +1069,92 @@ export function useTools() {
 
   const clearError = useCallback(() => setError(null), []);
 
+  const setCategory = useCallback((c: string | null) => {
+    console.log('[useTools] setCategory chamado:', c);
+    setFilters(p => ({ ...p, category: c, subcategory: null }));
+  }, []);
+
+  const setSearch = useCallback((s: string) => {
+    console.log('[useTools] setSearch chamado:', s);
+    setFilters(p => ({ ...p, search: s }));
+  }, []);
+
+  const setFavoritesOnly = useCallback((f: boolean) => {
+    console.log('[useTools] setFavoritesOnly chamado:', f);
+    setFilters(p => ({ ...p, favoritesOnly: f }));
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    console.log('[useTools] clearFilters chamado');
+    setFilters({ category: null, subcategory: null, search: '', favoritesOnly: false });
+  }, []);
+
   // ============================================================
-  // FILTRAR E PROCESSAR FERRAMENTAS (Lógica Unificada)
+  // FILTRAR FERRAMENTAS
   // ============================================================
+  const categoryMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    categories.forEach((cat: Category) => {
+      map[cat.id.toLowerCase()] = cat.name;
+      map[cat.name.toLowerCase()] = cat.name;
+    });
+    return map;
+  }, [categories]);
+
   const filteredTools = useMemo(() => {
     console.log('[useTools] filteredTools recalculando. filters:', JSON.stringify(filters), '| total tools:', tools?.length || 0);
-    
+    const userId = currentUser?.id;
     if (!Array.isArray(tools)) {
       console.error('[useTools] tools nao e array:', tools);
       return [];
     }
-
-    // DIAGNÓSTICO: verificar se existem ferramentas com categoria nula que escaparam
-    const nullCategoryTools = tools.filter((t: any) => !t || !t.category);
+    // DIAGNOSTICO: verificar se normalizacao funcionou
+    const nullCategoryTools = tools.filter((t: Tool) => !t || !t.category);
     if (nullCategoryTools.length > 0) {
-      console.error('[useTools] FERRAMENTAS COM CATEGORY NULO:', nullCategoryTools.map((t: any) => ({ id: t?.id, name: t?.name, category: t?.category })));
+      console.error('[useTools] FERRAMENTAS COM CATEGORY NULO:', nullCategoryTools.map((t: Tool) => ({ id: t?.id, name: t?.name, category: t?.category })));
     }
-
-    // 1. Filtro inicial com blindagem reforçada
-    let result = tools.filter((tool: any) => {
-      if (!tool || !tool.id) return false;
+    let result = tools.filter((tool: Tool) => {
+      // BLINDAGEM: pular itens nulos ou sem categoria
+      if (!tool || !tool.id) {
+        console.warn('[useTools] Ferramenta invalida (sem id):', tool);
+        return false;
+      }
+      const isOwner = tool.created_by === userId;
+      const inUserTools = userToolsData.has(tool.id);
+      if (!isOwner && !inUserTools) return false;
+      if (filters.category) {
+        const filterLower = filters.category.toLowerCase();
+        const toolCatLower = (tool.category || 'Geral').toLowerCase();
+        if (toolCatLower !== filterLower && toolCatLower !== categoryMap[filterLower]?.toLowerCase()) {
+          return false;
+        }
+      }
+      if (filters.favoritesOnly) {
+        const userData = userToolsData.get(tool.id);
+        if (!userData?.is_favorite) return false;
+      }
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        const matchesName = (tool.name || '').toLowerCase().includes(searchLower);
+        const matchesDesc = (tool.description || '').toLowerCase().includes(searchLower);
+        const matchesCategory = (tool.category || '').toLowerCase().includes(searchLower);
+        if (!matchesName && !matchesDesc && !matchesCategory) return false;
+      }
       return true;
     });
 
-    // 2. Filtro por Categoria (com blindagem de string)
-    if (filters.category && filters.category !== 'all') {
-      result = result.filter(tool => {
-        const toolCat = (typeof tool.category === 'string' ? tool.category : ((tool.category as any)?.name || 'Geral')).toLowerCase();
-        const filterCat = (filters.category || '').toLowerCase();
-        return toolCat === filterCat;
-      });
-    }
-
-    // 3. Filtro por busca (Search)
-    if (filters.search) {
-      const query = filters.search.toLowerCase();
-      result = result.filter(tool => 
-        (tool.name || '').toLowerCase().includes(query) ||
-        (tool.description || '').toLowerCase().includes(query)
-      );
-    }
-
-    // 4. Mapeamento final com trava de segurança absoluta (DENTRO do mesmo useMemo)
     // BLINDAGEM RADICAL: nenhuma ferramenta sem category sai do hook
-    return result
-      .filter((tool: any) => {
+    const mapped = result
+      .filter((tool: Tool) => {
         if (!tool) return false;
         if (!tool.category) {
           console.error('[useTools] FERRAMENTA SEM CATEGORY DESCARTADA:', { id: tool.id, name: tool.name });
-          return false; // DROP: impede que o erro chegue nos componentes
+          return false; // DROP: nao passa daqui
         }
         return true;
       })
-      .map((tool: any) => {
-        const userData: any = userToolsData?.get?.(tool.id) || {};
+      .map((tool: Tool) => {
+        const userData = userToolsData.get(tool.id);
         return {
           ...tool,
           category: tool.category || 'Geral',
@@ -1134,7 +1163,10 @@ export function useTools() {
           rating: userData?.rating || null,
         };
       });
-  }, [tools, userToolsData]);
+    console.log('[useTools] filteredTools resultado:', mapped.length, 'ferramentas (descartadas:', result.length - mapped.length, ')');
+    return mapped;
+  }, [tools, filters, userToolsData, categoryMap, currentUser?.id]);
+
   // ============================================================
   // LIMPAR HISTORICO DE ACESSOS
   // ============================================================
@@ -1163,75 +1195,42 @@ export function useTools() {
     }
   }, [currentUser?.id]);
 
-// ============================================================
-  // SETTERS DE FILTROS (Garantindo que existam no escopo)
   // ============================================================
-  const setCategory = useCallback((c: string | null) => {
-    console.log('[useTools] setCategory chamado:', c);
-    setFilters(p => ({ ...p, category: c, subcategory: null }));
-  }, []);
-
-  const setSearch = useCallback((s: string) => {
-    console.log('[useTools] setSearch chamado:', s);
-    setFilters(p => ({ ...p, search: s }));
-  }, []);
-
-  const setFavoritesOnly = useCallback((f: boolean) => {
-    console.log('[useTools] setFavoritesOnly chamado:', f);
-    setFilters(p => ({ ...p, favoritesOnly: f }));
-  }, []);
-
-  const clearFilters = useCallback(() => {
-    console.log('[useTools] clearFilters chamado');
-    setFilters({ category: null, subcategory: null, search: '', favoritesOnly: false });
-  }, []);
-
-  // ============================================================
-  // RETURN FINAL (Sincronizado com todas as funções do arquivo)
+  // RETURN
   // ============================================================
   return {
-    // Dados e Estados
-    tools: filteredTools || [],
-    allTools: tools || [],
+    tools: filteredTools,
+    allTools: tools,
     categories,
     clickData,
-    userProjects: projects,
-    userBudget: budget,
-    userSubscriptions: subscriptions,
-    loading: isLoading,
+    budget,
+    subscriptions,
+    projects,
+    filters,
+    isLoading,
     error,
-    
-    // Filtros e Busca
+    toggleFavorite,
+    saveNotes,
+    saveRating,
+    addTool,
+    editTool,
+    deleteTool,
+    addCategory,
+    editCategory,
+    deleteCategory,
+    recordAccess,
+    setUserBudget,
+    addSubscription,
+    deleteSubscription,
+    confirmSubscriptionPayment,
+    addProject,
+    deleteProject,
+    resetClicks,
     setCategory,
     setSearch,
     setFavoritesOnly,
     clearFilters,
     clearError,
-
-    // Gerenciamento de Ferramentas (Resolve erros TS6133)
-    saveNotes,
-    saveRating,
-    toggleFavorite,
-    addTool,
-    editTool,
-    deleteTool,
-    
-    // Categorias e Acessos (Resolve erros TS6133)
-    addCategory,
-    editCategory,
-    deleteCategory,
-    recordAccess,
-    resetClicks,
-    
-    // Financeiro e Projetos
-    setUserBudget,
-    addSubscription,
-    updateSubscription: (id: string, data: any) => supabaseUpdate('user_subscriptions', id, data),
-    deleteSubscription,
-    confirmSubscriptionPayment,
-    addProject,
-    deleteProject,
-    
-    refreshTools: () => fetchAllData(),
-  } as any;
+    refreshTools: fetchAllData,
+  };
 }
