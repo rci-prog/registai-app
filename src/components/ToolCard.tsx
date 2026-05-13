@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Heart, ExternalLink, Edit, Trash2, Star, FileText, MoreVertical
-} from 'lucide-center';
+} from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
