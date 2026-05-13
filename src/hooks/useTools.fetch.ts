@@ -1114,18 +1114,26 @@ export function useTools() {
     }
 
     // 4. Mapeamento final com trava de segurança absoluta (DENTRO do mesmo useMemo)
-    return result.map((tool: any) => {
-      if (!tool || !tool.id) return null;
-      
-      const userData: any = userToolsData?.get?.(tool.id) || {};
-      
-      return {
-        ...tool,
-        category: tool.category || 'Geral',
-        isFavorite: userData?.is_favorite || false,
-        notes: userData?.personal_notes || null,
-        rating: userData?.rating || null,
-      };
+    // BLINDAGEM RADICAL: nenhuma ferramenta sem category sai do hook
+    return result
+      .filter((tool: any) => {
+        if (!tool) return false;
+        if (!tool.category) {
+          console.error('[useTools] FERRAMENTA SEM CATEGORY DESCARTADA:', { id: tool.id, name: tool.name });
+          return false; // DROP: impede que o erro chegue nos componentes
+        }
+        return true;
+      })
+      .map((tool: any) => {
+        const userData: any = userToolsData?.get?.(tool.id) || {};
+        return {
+          ...tool,
+          category: tool.category || 'Geral',
+          isFavorite: userData?.is_favorite || false,
+          notes: userData?.personal_notes || null,
+          rating: userData?.rating || null,
+        };
+      });
     }).filter(Boolean);
 
   }, [tools, filters, userToolsData]);
