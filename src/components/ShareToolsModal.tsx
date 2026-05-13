@@ -48,14 +48,20 @@ export function ShareToolsModal({ isOpen, onClose, theme, currentUser, tools }: 
   // VALIDACAO SILENCIOSA DE EMAIL (debounce 600ms)
   // ============================================================
   const checkEmail = useCallback(async (email: string) => {
-    if (!email.trim() || !email.includes('@')) {
-      setEmailValidation({ valid: false, checking: false });
-      return;
-    }
-    setEmailValidation((prev) => ({ ...prev, checking: true }));
+  if (!email.trim() || !email.includes('@')) {
+    setEmailValidation({ valid: false, checking: false });
+    return;
+  }
+  setEmailValidation((prev) => ({ ...prev, checking: true }));
+  try {
     const result = await validateEmail(email.trim());
     setEmailValidation({ valid: result.valid, checking: false, blocked: result.blocked });
-  }, [validateEmail]);
+  } catch (e: any) {
+    // ESTA É A CORREÇÃO: Se der erro, ele para o spinner
+    console.error('[ShareToolsModal] Erro:', e.message);
+    setEmailValidation({ valid: false, checking: false });
+  }
+}, [validateEmail]);
 
   useEffect(() => {
     const timer = setTimeout(() => checkEmail(recipientEmail), 600);
