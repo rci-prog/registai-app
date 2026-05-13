@@ -184,7 +184,8 @@ export function ProjectArchiver({ projects, tools, theme, onAdd, onDelete }: Pro
     }
   };
 
-  const groupedProjects = projects.reduce((acc, project) => {
+    const safeProjects = Array.isArray(projects) ? projects : []; // BLINDAGEM
+  const groupedProjects = safeProjects.reduce((acc, project) => {
     if (!acc[project.type]) acc[project.type] = [];
     acc[project.type].push(project);
     return acc;
