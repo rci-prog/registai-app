@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { getAuth, supabase } from '@/lib/supabase-simple';
+import { useAuth } from '@/contexts/AuthContext';
 import type { FilterState } from '@/types';
 import { categories as defaultCategories } from '@/data/tools';
 
@@ -224,7 +224,7 @@ export function useTools() {
     favoritesOnly: false,
   });
 
-  const currentUser = getAuth();
+  const { currentUser } = useAuth();
 
   // Estados de budget e subscriptions
   const [budget, setBudget] = useState<{ monthly_limit: number; yearly_limit: number } | null>(null);
