@@ -15,7 +15,7 @@ export function BudgetGauges({ subscriptions, budget, theme, onSetBudget }: Budg
   // MODIFICAÇÃO PASSO 3: Uso do safeSubscriptions para evitar erro .reduce
   const monthlyCost = safeSubscriptions.reduce((sum: number, s: any) => sum + (s.cost || 0), 0);
   
-  const monthlyLimit = budget.monthly || 1000;
+  const monthlyLimit = (budget && budget.monthly) ? budget.monthly : 1000;
   const monthlyPercent = Math.min((monthlyCost / monthlyLimit) * 100, 100);
   const isOverBudget = monthlyCost > monthlyLimit;
 
