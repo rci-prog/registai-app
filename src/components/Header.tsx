@@ -35,12 +35,40 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
   return (
     <header className="w-full border-b border-slate-800/60 bg-slate-900/80 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Logo */}
+        {/* Logo registAI */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">R</span>
+          <svg
+            width="40"
+            height="40"
+            viewBox="0 0 40 40"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="flex-shrink-0"
+          >
+            <path
+              d="M20 2L36 11V29L20 38L4 29V11L20 2Z"
+              stroke="#8b5cf6"
+              strokeWidth="2"
+              fill="none"
+            />
+            <path
+              d="M12 16H28"
+              stroke="#8b5cf6"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+            <rect x="12" y="20" width="5" height="5" rx="1" fill="#8b5cf6" opacity="0.9" />
+            <rect x="17.5" y="20" width="5" height="5" rx="1" fill="#a78bfa" opacity="0.9" />
+            <rect x="23" y="20" width="5" height="5" rx="1" fill="#c4b5fd" opacity="0.9" />
+            <circle cx="20" cy="13" r="2.5" fill="#06b6d4" />
+          </svg>
+          
+          <div>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+              registAI
+            </h1>
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Catálogo Inteligente de IA</p>
           </div>
-          <span className="text-white font-semibold text-lg hidden sm:block">registAI</span>
         </div>
 
         {/* Actions */}
