@@ -9,8 +9,13 @@ interface AnalyticsSidebarProps {
 }
 
 export function AnalyticsSidebar({ tools, clickData, theme, onReset }: AnalyticsSidebarProps) {
-  const totalClicks = clickData.reduce((sum: number, c: any) => sum + (c.count || 0), 0);
-  const topTool = tools.length > 0 ? tools[0] : null;
+  // MODIFICAÇÃO PASSO 6: Blindagem para garantir que clickData seja um array antes do reduce
+  const safeClickData = Array.isArray(clickData) ? clickData : [];
+  const totalClicks = safeClickData.reduce((sum: number, c: any) => sum + (c.count || 0), 0);
+
+  // MODIFICAÇÃO PASSO 6: Blindagem para garantir que tools seja um array antes de acessar o índice
+  const safeTools = Array.isArray(tools) ? tools : [];
+  const topTool = safeTools.length > 0 ? safeTools[0] : null;
 
   return (
     <div className={`p-4 border-t ${theme === 'dark' ? 'border-slate-800' : 'border-gray-200'}`}>
