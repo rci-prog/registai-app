@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogOut, Shield, User, UserPlus, Bell, Moon, Sun } from 'lucide-react';
+import { LogOut, Shield, User, UserPlus, Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import type { AppNotification } from '@/hooks/useNotifications';
@@ -17,7 +17,7 @@ interface HeaderProps {
 }
 
 export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
-  const { currentUser, isAdmin, theme, logout, toggleTheme } = useAuth();
+  const { currentUser, isAdmin, theme, logout } = useAuth();
   const [supportOpen, setSupportOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [detailNotif, setDetailNotif] = useState<AppNotification | null>(null);
@@ -45,16 +45,6 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          {/* Theme Toggle */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleTheme}
-            className="text-slate-400 hover:text-white h-9 w-9 p-0"
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </Button>
-
           {!currentUser ? (
             <Button
               onClick={onLogin}
