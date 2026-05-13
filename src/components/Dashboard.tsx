@@ -588,22 +588,31 @@ export function Dashboard() {
                   ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'
                   : 'space-y-4'
               }>
-                {tools.map((tool: any) => (
-                  <ToolCard
-                    key={tool.id}
-                    tool={tool}
-                    isLoggedIn={!!currentUser}
-                    isAdmin={!!currentUser}
-                    theme={theme}
-                    categories={categories}
-                    onToggleFavorite={toggleFavorite}
-                    onSaveNotes={saveNotes}
-                    onRate={saveRating}
-                    onEdit={editTool}
-                    onDelete={deleteTool}
-                    onAccess={recordAccess}
-                  />
-                ))}
+                {(() => {
+  const invalidTools = tools.filter((t: any) => !t || !t.id || t.category === undefined || t.category === null);
+  if (invalidTools.length > 0) {
+    console.error('[Dashboard] FERRAMENTAS SEM CATEGORY (nao renderizadas):', invalidTools.map((t: any) => ({ id: t?.id, name: t?.name, category: t?.category })));
+  }
+  return null;
+})()}
+{tools
+  .filter((t: any) => t && t.id && t.category !== undefined && t.category !== null)
+  .map((tool: any) => (
+    <ToolCard
+      key={tool.id}
+      tool={tool}
+      isLoggedIn={!!currentUser}
+      isAdmin={!!currentUser}
+      theme={theme}
+      categories={categories}
+      onToggleFavorite={toggleFavorite}
+      onSaveNotes={saveNotes}
+      onRate={saveRating}
+      onEdit={editTool}
+      onDelete={deleteTool}
+      onAccess={recordAccess}
+    />
+  ))}
               </div>
             )}
           </div>
