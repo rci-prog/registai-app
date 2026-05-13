@@ -342,7 +342,6 @@ export function useTools() {
       } else {
         const toolsData = await toolsResponse.json();
         console.log('[useTools] Tools received:', toolsData?.length || 0);
-        // BLINDAGEM: normalizar category para string, nunca null/undefined
         const normalizedTools = (toolsData || []).map((t: any) => ({
           ...t,
           category: t.category || 'Geral',
@@ -630,7 +629,6 @@ export function useTools() {
       return { success: false, message: 'Voce precisa estar logado' };
     }
 
-    // BLINDAGEM: garantir que category seja sempre string (nunca objeto)
     let categoryValue = toolData.category;
     if (typeof categoryValue === 'object' && categoryValue !== null) {
       console.warn('[useTools] category era objeto, convertendo para string:', categoryValue);
@@ -680,7 +678,6 @@ export function useTools() {
       return { success: false, message: 'Voce precisa estar logado' };
     }
 
-    // BLINDAGEM: garantir que category seja sempre string
     let categoryValue = toolData.category;
     if (typeof categoryValue === 'object' && categoryValue !== null) {
       console.warn('[useTools] editTool: category era objeto, convertendo:', categoryValue);
@@ -1108,13 +1105,7 @@ export function useTools() {
       console.error('[useTools] tools nao e array:', tools);
       return [];
     }
-    // DIAGNOSTICO: verificar se normalizacao funcionou
-    const nullCategoryTools = tools.filter((t: Tool) => !t || !t.category);
-    if (nullCategoryTools.length > 0) {
-      console.error('[useTools] FERRAMENTAS COM CATEGORY NULO:', nullCategoryTools.map((t: Tool) => ({ id: t?.id, name: t?.name, category: t?.category })));
-    }
     let result = tools.filter((tool: Tool) => {
-      // BLINDAGEM: pular itens nulos ou sem categoria
       if (!tool || !tool.id) {
         console.warn('[useTools] Ferramenta invalida (sem id):', tool);
         return false;
@@ -1143,13 +1134,12 @@ export function useTools() {
       return true;
     });
 
-    // BLINDAGEM RADICAL: nenhuma ferramenta sem category sai do hook
     const mapped = result
       .filter((tool: Tool) => {
         if (!tool) return false;
         if (!tool.category) {
           console.error('[useTools] FERRAMENTA SEM CATEGORY DESCARTADA:', { id: tool.id, name: tool.name });
-          return false; // DROP: nao passa daqui
+          return false;
         }
         return true;
       })
