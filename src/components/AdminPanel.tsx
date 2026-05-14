@@ -266,7 +266,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
       const patchResp = await fetchWithTimeout(
         `${SUPABASE_URL}/rest/v1/profiles?id=eq.${data[0].id}`,
         {
-          method: 'PATCH',
+n          method: 'PATCH',
           headers: { ...adminHeaders(), 'Prefer': 'return=minimal' },
           body: JSON.stringify({ role: 'admin', updated_at: new Date().toISOString() }),
         },
@@ -659,7 +659,8 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                   <div className="flex items-center gap-3">
                     <div className="h-8 w-8 rounded-full bg-violet-600 flex items-center justify-center text-white text-xs font-bold">
                       {user.name?.charAt(0)?.toUpperCase() || 'U'}
-                                          <div>
+                    </div>
+                    <div>
                       <div className="text-sm font-medium text-white">{user.name}</div>
                       <div className="text-xs text-slate-400">{user.email}</div>
                       {user.created_at && (
@@ -698,8 +699,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
             </div>
           )}
         </div>
-
-        {/* Trending News Ads Section */}
+                {/* Trending News Ads Section */}
         <div className="space-y-3 border-t border-slate-700 pt-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white flex items-center gap-2">
