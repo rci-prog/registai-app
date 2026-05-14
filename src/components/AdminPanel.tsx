@@ -266,7 +266,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
       const patchResp = await fetchWithTimeout(
         `${SUPABASE_URL}/rest/v1/profiles?id=eq.${data[0].id}`,
         {
-n          method: 'PATCH',
+          method: 'PATCH',
           headers: { ...adminHeaders(), 'Prefer': 'return=minimal' },
           body: JSON.stringify({ role: 'admin', updated_at: new Date().toISOString() }),
         },
