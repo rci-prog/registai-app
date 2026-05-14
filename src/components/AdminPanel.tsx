@@ -71,12 +71,13 @@ interface AdminUser {
 interface TrendingAd {
   id: string;
   title: string;
-  link: string;
+  target_url: string;
   image_url?: string;
   status?: string;
   expires_at?: string;
   created_at?: string;
   owner_email?: string;
+  owner_id?: string;
 }
 
 interface DailyClick {
@@ -322,7 +323,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   };
 
   // ============================================================
-  // CREATE AD — com JWT + LOGGING DETALHADO PARA DEBUG
+  // CREATE AD — com JWT + owner_id para RLS + LOGGING DETALHADO
   // ============================================================
   const handleCreateAd = async () => {
     if (!newAdTitle.trim() || !newAdTargetUrl.trim()) {
@@ -331,9 +332,20 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
     setIsCreatingAd(true); setAdMsg(null);
     console.log('[Admin][handleCreateAd] Iniciando criacao...');
     console.log('[Admin][handleCreateAd] Titulo:', newAdTitle.trim());
-    console.log('[Admin][handleCreateAd] Link:', newAdTargetUrl.trim());
+    console.log('[Admin][handleCreateAd] URL:', newAdTargetUrl.trim());
 
     try {
+      // Extrair userId do token JWT para RLS (owner_id = auth.uid())
+      let ownerId: string | null = null;
+      try {
+        const sessionStr = localStorage.getItem('sb-cmfgirvgnexkcomhcosm-auth-token');
+        if (sessionStr) {
+          const session = JSON.parse(sessionStr);
+          ownerId = session?.user?.id || null;
+        }
+      } catch { /* ignore */ }
+      console.log('[Admin][handleCreateAd] ownerId:', ownerId);
+
       const body: Record<string, any> = {
         title: newAdTitle.trim(),
         target_url: newAdTargetUrl.trim(),
@@ -341,6 +353,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
         status: 'active',
         created_at: new Date().toISOString(),
         owner_email: newAdOwnerEmail?.trim() || null,
+        owner_id: ownerId,
       };
       if (!newAdIndeterminate && newAdExpiresAt?.trim()) {
         body.expires_at = new Date(newAdExpiresAt.trim()).toISOString();
@@ -367,8 +380,8 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
 
       const data = await resp.json();
       console.log('[Admin][handleCreateAd] Resposta:', data);
-      setAds([data?.[0] || body, ...ads]);
-      setAdMsg('Publicacao criada com sucesso!');
+      setAds(prev => [data?.[0] || body, ...prev]);
+      setAdMsg('✅ Publicacao criada com sucesso!');
       setNewAdTitle(''); setNewAdTargetUrl(''); setNewAdImageUrl('');
       setNewAdExpiresAt(''); setNewAdIndeterminate(true);
       setNewAdOwnerEmail('');
@@ -382,15 +395,16 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   };
 
   // ============================================================
-  // DELETE AD — com JWT + LOGGING DETALHADO + return=representation
+  // DELETE AD — sem return=representation + reload + prev state
   // ============================================================
   const handleDeleteAd = async () => {
     if (!deleteAdTarget) return;
     console.log('[Admin][handleDeleteAd] Deletando ad ID:', deleteAdTarget.id, 'Titulo:', deleteAdTarget.title);
+    const deletedId = deleteAdTarget.id;
     try {
       const resp = await fetchWithTimeout(
-        `${SUPABASE_URL}/rest/v1/trending_ads?id=eq.${deleteAdTarget.id}`,
-        { method: 'DELETE', headers: { ...adminHeaders(), 'Prefer': 'return=representation' } },
+        `${SUPABASE_URL}/rest/v1/trending_ads?id=eq.${deletedId}`,
+        { method: 'DELETE', headers: adminHeaders() },
         10000,
       );
       console.log('[Admin][handleDeleteAd] Status:', resp.status);
@@ -399,10 +413,11 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
         console.error('[Admin][handleDeleteAd] Erro:', resp.status, errText);
         throw new Error(`${resp.status}: ${errText || 'Erro ao deletar'}`);
       }
-      const deleted = await resp.json();
-      console.log('[Admin][handleDeleteAd] Deletado:', deleted);
-      setAds(ads.filter((a) => a.id !== deleteAdTarget.id));
-      setAdMsg('Publicacao removida.');
+      // DELETE com sucesso retorna 204 sem body — remover do estado local imediatamente
+      setAds(prev => prev.filter((a) => a.id !== deletedId));
+      setAdMsg('✅ Publicacao removida.');
+      // Recarregar do servidor para garantir sincronizacao
+      setTimeout(() => loadAds(), 500);
     } catch (e: any) {
       console.error('[Admin][handleDeleteAd] Exception:', e);
       setAdMsg('Erro ao remover: ' + (e.message || String(e)));
@@ -603,7 +618,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                       className={user.is_blocked ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-amber-400 hover:bg-amber-500/10'}
                       title={user.is_blocked ? 'Desbloquear' : 'Bloquear'}
                     >
-                      {user.is_blocked ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                                            {user.is_blocked ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
                     </Button>
                     {!isAdminEmail(user.email) && (
                       <Button
@@ -716,8 +731,16 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
           )}
         </div>
 
-        {/* Create Ad Modal */}
-        <Dialog open={showAdModal} onOpenChange={setShowAdModal}>
+        {/* Create Ad Modal — com onOpenChange que limpa estados ao fechar */}
+        <Dialog open={showAdModal} onOpenChange={(o) => {
+          setShowAdModal(o);
+          if (!o) {
+            // Limpar todos os estados do formulario ao fechar o modal
+            setNewAdTitle(''); setNewAdTargetUrl(''); setNewAdImageUrl('');
+            setNewAdExpiresAt(''); setNewAdIndeterminate(true); setNewAdOwnerEmail('');
+            setAdMsg(null);
+          }
+        }}>
           <DialogContent className="max-w-lg bg-slate-900 border-slate-700 text-white">
             <DialogHeader>
               <DialogTitle className="text-white flex items-center gap-2">
