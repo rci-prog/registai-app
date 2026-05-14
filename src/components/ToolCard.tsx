@@ -127,7 +127,7 @@ export function ToolCard({
           <div className="flex items-start gap-3">
             <div className="relative flex-shrink-0">
               <img src={tool?.image_url || `https://www.google.com/s2/favicons?domain=${tool?.url}&sz=128`}
-                alt={tool?.name} className="w-12 h-12 rounded-lg object-cover"
+                alt={tool?.name} className="w-12 h-12 rounded-lg object-contain bg-slate-800/50 p-0.5"
                 onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/48?text=AI'; }} />
               {tool?.isFavorite && (
                 <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
