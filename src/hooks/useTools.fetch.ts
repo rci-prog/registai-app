@@ -105,13 +105,34 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeout = 100
 }
 
 // ============================================================
+// TOKEN JWT DO USUARIO LOGADO (necessario para passar RLS)
+// ============================================================
+function getUserToken(): string | null {
+  try {
+    const raw = localStorage.getItem('sb-cmfgirvgnexkcomhcosm-auth-token');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.access_token || null;
+  } catch {
+    return null;
+  }
+}
+
+function authHeaders(): Record<string, string> {
+  const userToken = getUserToken();
+  return {
+    'apikey': SUPABASE_KEY,
+    'Authorization': userToken ? `Bearer ${userToken}` : `Bearer ${SUPABASE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+// ============================================================
 // SUPABASE CRUD DIRECT
 // ============================================================
 async function supabaseInsert(table: string, data: any) {
   const headers: Record<string, string> = {
-    'apikey': SUPABASE_KEY,
-    'Authorization': `Bearer ${SUPABASE_KEY}`,
-    'Content-Type': 'application/json',
+    ...authHeaders(),
     'Prefer': 'return=representation',
   };
 
@@ -134,9 +155,7 @@ async function supabaseInsert(table: string, data: any) {
 
 async function supabaseUpdate(table: string, id: string, data: any) {
   const headers: Record<string, string> = {
-    'apikey': SUPABASE_KEY,
-    'Authorization': `Bearer ${SUPABASE_KEY}`,
-    'Content-Type': 'application/json',
+    ...authHeaders(),
     'Prefer': 'return=representation',
   };
 
@@ -159,9 +178,7 @@ async function supabaseUpdate(table: string, id: string, data: any) {
 
 async function supabaseDelete(table: string, id: string) {
   const headers: Record<string, string> = {
-    'apikey': SUPABASE_KEY,
-    'Authorization': `Bearer ${SUPABASE_KEY}`,
-    'Content-Type': 'application/json',
+    ...authHeaders(),
   };
 
   const url = `${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`;
@@ -889,7 +906,7 @@ export function useTools() {
       const url = `${SUPABASE_URL}/rest/v1/categories?id=eq.${id}&user_id=eq.${currentUser.id}`;
       const res = await fetchWithTimeout(url, {
         method: 'PATCH',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+        headers: { ...authHeaders(), 'Prefer': 'return=representation' },
         body: JSON.stringify({ name: newName }),
       }, 10000);
 
@@ -924,7 +941,7 @@ export function useTools() {
       const url = `${SUPABASE_URL}/rest/v1/categories?id=eq.${id}&user_id=eq.${currentUser.id}`;
       const res = await fetchWithTimeout(url, {
         method: 'DELETE',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        headers: authHeaders(),
       }, 10000);
 
       if (!res.ok) {
