@@ -50,7 +50,7 @@ export function useToolTransfers() {
     endpoint: string,
     options: { method?: string; body?: any; prefer?: string } = {}
   ): Promise<any> => {
-    const url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
+    const url = `${SUPABASE_URL}/rest/v1/tool_transfers?select=*&recipient_id=eq.${recipientId}&status=eq.pending&order=created_at.desc`;
     const headers: Record<string, string> = { ...authHeaders() };
     if (options.prefer) headers['Prefer'] = options.prefer;
 
