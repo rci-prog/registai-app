@@ -34,12 +34,27 @@ const NATIVE_CATEGORY_NAMES = new Set([
   'pdf',
 ]);
 
-function isNativeCategory(id: string): boolean {
-  return NATIVE_CATEGORY_IDS.has(id);
+function normalizeForCompare(str: string): string {
+  return str.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
-function isNativeCategoryName(name: string): boolean {
+export function isNativeCategory(id: string): boolean {
+  if (NATIVE_CATEGORY_IDS.has(id)) return true;
+  return NATIVE_CATEGORY_IDS.has(normalizeForCompare(id));
+}
+
+export function isNativeCategoryName(name: string): boolean {
+  const normalized = normalizeForCompare(name);
+  if (NATIVE_CATEGORY_NAMES.has(normalized)) return true;
   return NATIVE_CATEGORY_NAMES.has(name.toLowerCase().trim());
+}
+
+function isDuplicateOfNative(c: any): boolean {
+  if (isNativeCategory(c.id)) return true;
+  if (isNativeCategoryName(c.name)) return true;
+  const normalizedName = normalizeForCompare(c.name);
+  const nativeNames = ['chatbots', 'imagens', 'videos', 'apresentacoes', 'audio', 'produtividade', 'desenvolvimento', 'pdf'];
+  return nativeNames.includes(normalizedName);
 }
 
 // ============================================================
@@ -433,7 +448,7 @@ export function useTools() {
 
           if (catsData && catsData.length > 0) {
             // Filtrar apenas categorias personalizadas (nao nativas)
-            const customCats = catsData.filter((c: any) => !isNativeCategory(c.id));
+            const customCats = catsData.filter((c: any) => !isDuplicateOfNative(c));
             console.log('[useTools] Custom categories (nao nativas):', customCats.length);
 
             // Adicionar categorias personalizadas ao merge
@@ -821,7 +836,7 @@ export function useTools() {
 
     try {
       const id = name.toLowerCase().replace(/\s+/g, '-');
-      
+
       // BLOQUEIO: nao permitir ID que conflita com nativo
       if (isNativeCategory(id)) {
         console.warn('[useTools] TENTATIVA BLOQUEADA: ID conflita com categoria nativa:', id);
