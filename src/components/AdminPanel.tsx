@@ -461,18 +461,68 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   };
 
   // ============================================================
-  // FETCH URL PREVIEW (title + image)
+  // FETCH URL PREVIEW (og:title + og:image via proxy CORS)
   // ============================================================
   const fetchUrlPreview = async () => {
     if (!newAdTargetUrl.trim()) return;
-    setIsFetchingPreview(true);
+    setIsFetchingPreview(true); setAdMsg(null);
     try {
       const url = new URL(newAdTargetUrl);
       const domain = url.hostname.replace('www.', '');
-      if (!newAdTitle.trim()) setNewAdTitle(domain.charAt(0).toUpperCase() + domain.slice(1));
-      if (!newAdImageUrl.trim()) {
-        setNewAdImageUrl(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
+
+      // 1) Tenta buscar HTML da pagina via proxy CORS para extrair og:title e og:image
+      let extractedTitle: string | null = null;
+      let extractedImage: string | null = null;
+      try {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(newAdTargetUrl.trim())}`;
+        const resp = await fetchWithTimeout(proxyUrl, {}, 10000);
+        if (resp.ok) {
+          const html = await resp.text();
+          // og:title (Open Graph)
+          const ogTitle = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1];
+          const twTitle = html.match(/<meta[^>]+name=["']twitter:title["'][^>]+content=["']([^"']+)["']/i)?.[1];
+          const titleTag = html.match(/<title>([^<]+)<\/title>/i)?.[1]?.trim();
+          extractedTitle = ogTitle || twTitle || titleTag || null;
+
+          // og:image (Open Graph image — alta qualidade)
+          const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1];
+          const twImage = html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)?.[1];
+          const ogImgSecure = html.match(/<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["']/i)?.[1];
+          extractedImage = ogImgSecure || ogImage || twImage || null;
+        }
+      } catch (e) {
+        console.log('[Admin][fetchUrlPreview] Proxy falhou, usando fallbacks:', e);
       }
+
+      // 2) Titulo: extrair > domain cru
+      if (!newAdTitle.trim()) {
+        if (extractedTitle) {
+          setNewAdTitle(extractedTitle.substring(0, 100));
+        } else {
+          setNewAdTitle(domain.charAt(0).toUpperCase() + domain.slice(1));
+        }
+      }
+
+      // 3) Imagem: og:image > Clearbit Logo > Google favicon
+      if (!newAdImageUrl.trim()) {
+        if (extractedImage) {
+          // og:image pode ser URL relativa — converte para absoluta
+          if (extractedImage.startsWith('//')) {
+            extractedImage = url.protocol + extractedImage;
+          } else if (extractedImage.startsWith('/')) {
+            extractedImage = `${url.protocol}//${url.hostname}${extractedImage}`;
+          }
+          setNewAdImageUrl(extractedImage);
+          console.log('[Admin][fetchUrlPreview] og:image encontrada:', extractedImage);
+        } else {
+          // Fallback: Clearbit Logo API (alta qualidade, 99% dos sites)
+          setNewAdImageUrl(`https://logo.clearbit.com/${domain}?size=128`);
+          console.log('[Admin][fetchUrlPreview] Fallback Clearbit:', domain);
+        }
+      }
+
+      setAdMsg('Dados carregados!');
+      setTimeout(() => setAdMsg(null), 2000);
     } catch {
       setAdMsg('URL invalida.');
     }
