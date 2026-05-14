@@ -422,16 +422,11 @@ export function useTools() {
     setError(null);
 
     try {
-      console.log('[useTools] [STEP 1/4] Fetching all tools from catalog...');
-      const headers: Record<string, string> = {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-      };
+      console.log('[useTools] [STEP 1/4] Fetching all tools...');
       const toolsUrl = `${SUPABASE_URL}/rest/v1/tools?select=*&order=name.asc`;
       const toolsResponse = await fetchWithTimeout(toolsUrl, {
         method: 'GET',
-        headers,
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
       }, 15000);
       if (!toolsResponse.ok) {
         const text = await toolsResponse.text();
@@ -440,6 +435,7 @@ export function useTools() {
       } else {
         const toolsData = await toolsResponse.json();
         console.log('[useTools] Tools received:', toolsData?.length || 0);
+        // BLINDAGEM: normalizar category para string, nunca null/undefined
         const normalizedTools = (toolsData || []).map((t: any) => ({
           ...t,
           category: t.category || 'Geral',
