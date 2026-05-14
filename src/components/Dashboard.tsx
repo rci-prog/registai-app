@@ -759,7 +759,7 @@ export function Dashboard() {
               Gerenciar Categorias
             </DialogTitle>
             <DialogDescription className={theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}>
-              Adicione, edite ou remova categorias de ferramentas.
+              Adicione, edite ou remova novas categorias de ferramentas.
             </DialogDescription>
           </DialogHeader>
 
