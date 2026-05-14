@@ -14,7 +14,7 @@ import {
 import {
   Shield, Users, UserPlus, Trash2, Loader2, Mail,
   AlertTriangle, Megaphone, Plus, CheckCircle, XCircle, Send,
-  Upload, Image as ImageIcon, BarChart3,
+  Upload, Image as ImageIcon, BarChart3, RefreshCw,
 } from 'lucide-react';
 
 const SUPABASE_URL = 'https://cmfgirvgnexkcomhcosm.supabase.co';
@@ -142,6 +142,9 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   const [isCreatingAd, setIsCreatingAd] = useState(false);
   const [isFetchingPreview, setIsFetchingPreview] = useState(false);
   const fileInputRef = { current: null as HTMLInputElement | null };
+
+  // Ad description
+  const [newAdDescription, setNewAdDescription] = useState('');
 
   // Owner email
   const [newAdOwnerEmail, setNewAdOwnerEmail] = useState('');
@@ -348,6 +351,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
 
       const body: Record<string, any> = {
         title: newAdTitle.trim(),
+        description: newAdDescription?.trim() || null,
         target_url: newAdTargetUrl.trim(),
         image_url: newAdImageUrl?.trim() || null,
         status: 'active',
@@ -382,7 +386,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
       console.log('[Admin][handleCreateAd] Resposta:', data);
       setAds(prev => [data?.[0] || body, ...prev]);
       setAdMsg('✅ Publicacao criada com sucesso!');
-      setNewAdTitle(''); setNewAdTargetUrl(''); setNewAdImageUrl('');
+      setNewAdTitle(''); setNewAdDescription(''); setNewAdTargetUrl(''); setNewAdImageUrl('');
       setNewAdExpiresAt(''); setNewAdIndeterminate(true);
       setNewAdOwnerEmail('');
       setShowAdModal(false);
@@ -462,7 +466,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
 
   // ============================================================
   // FETCH URL PREVIEW (og:title + og:image via proxy CORS)
-  // Fallback garantido: Google Favicon (100% confiavel)
+  // Fallback: Screenshot 11ty (alta qualidade, formato OpenGraph)
   // ============================================================
   const fetchUrlPreview = async () => {
     if (!newAdTargetUrl.trim()) return;
@@ -511,11 +515,12 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
         setNewAdTitle(domain.charAt(0).toUpperCase() + domain.slice(1));
       }
 
-      // 3) Imagem fallback: Google Favicon (100% confiavel)
+      // 3) Imagem fallback: Screenshot 11ty (alta qualidade, formato OpenGraph)
       if (!imageSet && !newAdImageUrl.trim()) {
         const screenshotUrl = `https://v1.screenshot.11ty.dev/${encodeURIComponent(newAdTargetUrl.trim())}/opengraph/`;
-setNewAdImageUrl(screenshotUrl);
-        console.log('[Admin][fetchUrlPreview] Google Favicon:', domain);
+        setNewAdImageUrl(screenshotUrl);
+        imageSet = true;
+        console.log('[Admin][fetchUrlPreview] Screenshot 11ty:', screenshotUrl);
       }
 
       setAdMsg('Dados carregados!');
@@ -605,9 +610,20 @@ setNewAdImageUrl(screenshotUrl);
 
         {/* Users Section */}
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Users className="w-4 h-4 text-violet-500" /> Usuarios
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Users className="w-4 h-4 text-violet-500" /> Usuarios
+            </h3>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => { loadUsers(); loadAds(); }}
+              className="text-slate-400 hover:text-white hover:bg-slate-800 h-7 px-2"
+              title="Atualizar usuarios e ads"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </Button>
+          </div>
 
           {/* Add Admin */}
           <div className="flex gap-2">
@@ -642,7 +658,7 @@ setNewAdImageUrl(screenshotUrl);
                 >
                   <div className="flex items-center gap-3">
                     <div className="h-8 w-8 rounded-full bg-violet-600 flex items-center justify-center text-white text-xs font-bold">
-                      {user.name?.charAt(0)?.toUpperCase() || 'U'}
+                                            {user.name?.charAt(0)?.toUpperCase() || 'U'}
                     </div>
                     <div>
                       <div className="text-sm font-medium text-white">{user.name}</div>
@@ -665,7 +681,7 @@ setNewAdImageUrl(screenshotUrl);
                       className={user.is_blocked ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-amber-400 hover:bg-amber-500/10'}
                       title={user.is_blocked ? 'Desbloquear' : 'Bloquear'}
                     >
-                                            {user.is_blocked ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                      {user.is_blocked ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
                     </Button>
                     {!isAdminEmail(user.email) && (
                       <Button
@@ -783,7 +799,7 @@ setNewAdImageUrl(screenshotUrl);
           setShowAdModal(o);
           if (!o) {
             // Limpar todos os estados do formulario ao fechar o modal
-            setNewAdTitle(''); setNewAdTargetUrl(''); setNewAdImageUrl('');
+            setNewAdTitle(''); setNewAdDescription(''); setNewAdTargetUrl(''); setNewAdImageUrl('');
             setNewAdExpiresAt(''); setNewAdIndeterminate(true); setNewAdOwnerEmail('');
             setAdMsg(null);
           }
@@ -821,6 +837,23 @@ setNewAdImageUrl(screenshotUrl);
                   placeholder="Titulo da publicacao"
                   className="bg-slate-800 border-slate-700 text-white"
                 />
+              </div>
+
+              {/* Description */}
+              <div>
+                <Label className="text-slate-400">Texto da Publicacao <span className="text-[10px] text-slate-500">(opcional, max 300 caracteres)</span></Label>
+                <textarea
+                  value={newAdDescription}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 300) {
+                      setNewAdDescription(e.target.value);
+                    }
+                  }}
+                  placeholder="Digite o texto descritivo da publicacao..."
+                  rows={3}
+                  className="w-full rounded-md border px-3 py-2 text-sm resize-none bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                />
+                <p className="text-[10px] text-slate-500 text-right mt-0.5">{newAdDescription.length}/300</p>
               </div>
 
               {/* Owner Email */}
