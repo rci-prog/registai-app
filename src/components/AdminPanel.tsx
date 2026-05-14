@@ -658,9 +658,9 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                 >
                   <div className="flex items-center gap-3">
                     <div className="h-8 w-8 rounded-full bg-violet-600 flex items-center justify-center text-white text-xs font-bold">
-                                            {user.name?.charAt(0)?.toUpperCase() || 'U'}
-                    </div>
-                    <div>
+                      {user.name?.charAt(0)?.toUpperCase() || 'U'}
+
+                                          <div>
                       <div className="text-sm font-medium text-white">{user.name}</div>
                       <div className="text-xs text-slate-400">{user.email}</div>
                       {user.created_at && (
@@ -794,11 +794,10 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
           )}
         </div>
 
-        {/* Create Ad Modal — com onOpenChange que limpa estados ao fechar */}
+        {/* Create Ad Modal — com cleanup garantido em TODAS as formas de fechar */}
         <Dialog open={showAdModal} onOpenChange={(o) => {
           setShowAdModal(o);
           if (!o) {
-            // Limpar todos os estados do formulario ao fechar o modal
             setNewAdTitle(''); setNewAdDescription(''); setNewAdTargetUrl(''); setNewAdImageUrl('');
             setNewAdExpiresAt(''); setNewAdIndeterminate(true); setNewAdOwnerEmail('');
             setAdMsg(null);
@@ -948,7 +947,16 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
 
               {/* Buttons */}
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowAdModal(false)} className="border-slate-700 text-slate-300">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowAdModal(false);
+                    setNewAdTitle(''); setNewAdDescription(''); setNewAdTargetUrl(''); setNewAdImageUrl('');
+                    setNewAdExpiresAt(''); setNewAdIndeterminate(true); setNewAdOwnerEmail('');
+                    setAdMsg(null);
+                  }}
+                  className="border-slate-700 text-slate-300"
+                >
                   Cancelar
                 </Button>
                 <Button
