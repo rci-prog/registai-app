@@ -3,6 +3,40 @@ import { useState, useEffect, useCallback } from 'react';
 const SUPABASE_URL = 'https://cmfgirvgnexkcomhcosm.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Dm-ozWvAve1nkgjEDg_QsA_-gldlMxk';
 
+// ============================================================
+// EXTRAI O JWT DO USUARIO LOGADO DO LOCALSTORAGE DO SUPABASE
+// ============================================================
+function getUserAuthToken(): string | null {
+  try {
+    const sessionStr = localStorage.getItem('sb-cmfgirvgnexkcomhcosm-auth-token');
+    if (sessionStr) {
+      const session = JSON.parse(sessionStr);
+      if (session?.access_token) return session.access_token;
+    }
+    const fallbackKeys = Object.keys(localStorage).filter(k =>
+      k.includes('auth') && k.includes('token') && !k.includes('expires')
+    );
+    for (const key of fallbackKeys) {
+      try {
+        const val = JSON.parse(localStorage.getItem(key) || '{}');
+        if (val?.access_token) return val.access_token;
+      } catch { /* ignore */ }
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+// Monta header Authorization com JWT do usuario logado
+function userAuthHeaders(contentType = true): Record<string, string> {
+  const token = getUserAuthToken();
+  const headers: Record<string, string> = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': token ? `Bearer ${token}` : `Bearer ${SUPABASE_KEY}`,
+  };
+  if (contentType) headers['Content-Type'] = 'application/json';
+  return headers;
+}
+
 export interface AppNotification {
   id: string;
   type: 'ad_report' | 'system' | 'alert';
@@ -23,6 +57,9 @@ export interface SendNotificationParams {
   type?: 'ad_report' | 'system' | 'alert';
 }
 
+// ============================================================
+// sendNotificationToProfile — agora com JWT autenticado
+// ============================================================
 export async function sendNotificationToProfile(params: SendNotificationParams): Promise<boolean> {
   const { ownerEmail, title, message, data, type = 'ad_report' } = params;
 
@@ -30,11 +67,7 @@ export async function sendNotificationToProfile(params: SendNotificationParams):
     const url = `${SUPABASE_URL}/rest/v1/profiles?select=notifications,id&email=eq.${encodeURIComponent(ownerEmail)}`;
     const resp = await fetch(url, {
       method: 'GET',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers: userAuthHeaders(),
     });
     if (!resp.ok) return false;
     const profiles = await resp.json();
@@ -61,12 +94,7 @@ export async function sendNotificationToProfile(params: SendNotificationParams):
     const patchUrl = `${SUPABASE_URL}/rest/v1/profiles?id=eq.${profileId}`;
     const patchResp = await fetch(patchUrl, {
       method: 'PATCH',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
-      },
+      headers: userAuthHeaders(),
       body: JSON.stringify({
         notifications: updated,
         updated_at: new Date().toISOString(),
@@ -84,15 +112,15 @@ export function useNotifications(userEmail?: string) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  // ============================================================
+  // patchProfile — agora com JWT autenticado
+  // ============================================================
   async function patchProfile(email: string, notifs: AppNotification[]): Promise<boolean> {
     try {
       const searchUrl = `${SUPABASE_URL}/rest/v1/profiles?select=id&email=eq.${encodeURIComponent(email)}`;
       const searchResp = await fetch(searchUrl, {
         method: 'GET',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-        },
+        headers: userAuthHeaders(),
       });
       if (!searchResp.ok) return false;
       const profiles = await searchResp.json();
@@ -101,12 +129,7 @@ export function useNotifications(userEmail?: string) {
       const patchUrl = `${SUPABASE_URL}/rest/v1/profiles?id=eq.${profiles[0].id}`;
       const patchResp = await fetch(patchUrl, {
         method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal',
-        },
+        headers: userAuthHeaders(),
         body: JSON.stringify({
           notifications: notifs,
           updated_at: new Date().toISOString(),
@@ -118,15 +141,15 @@ export function useNotifications(userEmail?: string) {
     }
   }
 
+  // ============================================================
+  // fetchProfileNotifications — agora com JWT autenticado
+  // ============================================================
   async function fetchProfileNotifications(email: string): Promise<AppNotification[]> {
     try {
       const url = `${SUPABASE_URL}/rest/v1/profiles?select=notifications&email=eq.${encodeURIComponent(email)}`;
       const resp = await fetch(url, {
         method: 'GET',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-        },
+        headers: userAuthHeaders(),
       });
       if (!resp.ok) return [];
       const data = await resp.json();
