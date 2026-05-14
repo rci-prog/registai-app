@@ -513,7 +513,8 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
 
       // 3) Imagem fallback: Google Favicon (100% confiavel)
       if (!imageSet && !newAdImageUrl.trim()) {
-        setNewAdImageUrl(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
+        const screenshotUrl = `https://v1.screenshot.11ty.dev/${encodeURIComponent(newAdTargetUrl.trim())}/opengraph/`;
+setNewAdImageUrl(screenshotUrl);
         console.log('[Admin][fetchUrlPreview] Google Favicon:', domain);
       }
 
