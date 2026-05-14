@@ -336,7 +336,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
     try {
       const body: Record<string, any> = {
         title: newAdTitle.trim(),
-        link: newAdTargetUrl.trim(),
+        target_url: newAdTargetUrl.trim(),
         image_url: newAdImageUrl?.trim() || null,
         status: 'active',
         created_at: new Date().toISOString(),
