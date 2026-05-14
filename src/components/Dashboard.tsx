@@ -268,7 +268,7 @@ export function Dashboard() {
         description: `Ferramenta de IA acessivel em ${url.hostname}`,
         url: autoGenUrl,
         category: categories[0]?.id || 'Chatbots',
-        image_url: `https://www.google.com/s2/favicons?domain= ${url.hostname}&sz=128`,
+        image_url: `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=128`,
       });
       // Mostrar aviso sobre campos que precisam ser personalizados
       setShowScrapeWarning(true);
