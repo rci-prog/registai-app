@@ -65,8 +65,9 @@ export function useToolTransfers() {
       console.error(`[useToolTransfers] HTTP ${resp.status}: ${text} | URL: ${url}`);
       throw new Error(`HTTP ${resp.status}: ${text}`);
     }
-    if (resp.status === 204) return null;
-    return resp.json();
+    const text = await resp.text();
+  if (!text) return null;
+  try { return JSON.parse(text); } catch { return null; }
   }, []);
 
   const fetchPendingTransfers = useCallback(async (userId: string) => {
