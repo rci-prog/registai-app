@@ -5,6 +5,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { getAuth } from '@/lib/supabase-simple';
 
+// CORRECAO 1: URL sem espaço no final
 const SUPABASE_URL = 'https://cmfgirvgnexkcomhcosm.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Dm-ozWvAve1nkgjEDg_QsA_-gldlMxk';
 const AUTH_KEY = 'sb-cmfgirvgnexkcomhcosm-auth-token';
@@ -46,11 +47,14 @@ export function useToolTransfers() {
   const [pendingCount, setPendingCount] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ============================================================
+  // CORRECAO 2: supabaseFetch generica — recebe endpoint e constroi URL
+  // ============================================================
   const supabaseFetch = useCallback(async (
     endpoint: string,
     options: { method?: string; body?: any; prefer?: string } = {}
   ): Promise<any> => {
-    const url = `${SUPABASE_URL}/rest/v1/tool_transfers?select=*&recipient_id=eq.${recipientId}&status=eq.pending&order=created_at.desc`;
+    const url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
     const headers: Record<string, string> = { ...authHeaders() };
     if (options.prefer) headers['Prefer'] = options.prefer;
 
@@ -65,30 +69,35 @@ export function useToolTransfers() {
       console.error(`[useToolTransfers] HTTP ${resp.status}: ${text} | URL: ${url}`);
       throw new Error(`HTTP ${resp.status}: ${text}`);
     }
+    // CORRECAO 3: Body vazio em qualquer status (return=minimal = body vazio)
     const text = await resp.text();
-  if (!text) return null;
-  try { return JSON.parse(text); } catch { return null; }
+    if (!text) return null;
+    try { return JSON.parse(text); } catch { return null; }
   }, []);
 
-  const fetchPendingTransfers = useCallback(async (userId: string) => {
-    if (!userId) return;
+  // ============================================================
+  // CORRECAO 4: Buscar APENAS transferencias onde usuario e DESTINATARIO
+  // Quem enviou (sender_id) NAO deve ver o proprio pacote
+  // ============================================================
+  const fetchPendingTransfers = useCallback(async (recipientId: string) => {
+    if (!recipientId) return;
     try {
       const data = await supabaseFetch(
-        `tool_transfers?select=*&or=(sender_id.eq.${userId},recipient_id.eq.${userId})&order=created_at.desc`
+        `tool_transfers?select=*&recipient_id=eq.${recipientId}&status=eq.pending&order=created_at.desc`
       );
       const mapped = (data || []).map((t: any) => ({
         ...t,
         tool_ids: Array.isArray(t.tool_ids) ? t.tool_ids
           : (typeof t.tool_ids === 'string' ? JSON.parse(t.tool_ids || '[]') : []),
       }));
-      const pending = mapped.filter((t: ToolTransfer) => t.status === 'pending');
-      setTransfers(pending);
-      setPendingCount(pending.length);
+      setTransfers(mapped);
+      setPendingCount(mapped.length);
     } catch (e: any) {
       console.error('[useToolTransfers] fetchPendingTransfers erro:', e.message);
     }
   }, [supabaseFetch]);
 
+  // Validar email — busca profile por email
   const validateEmail = useCallback(async (email: string): Promise<{
     valid: boolean; userId?: string; email?: string; blocked?: boolean;
   }> => {
@@ -106,6 +115,7 @@ export function useToolTransfers() {
     }
   }, [supabaseFetch]);
 
+  // Criar transferencia
   const createTransfer = useCallback(async (
     senderId: string, senderEmail: string,
     recipientId: string, recipientEmail: string,
@@ -131,6 +141,7 @@ export function useToolTransfers() {
     }
   }, [supabaseFetch]);
 
+  // Responder transferencia
   const respondToTransfer = useCallback(async (
     transferId: string, response: 'accepted' | 'rejected'
   ): Promise<{ success: boolean; error?: string }> => {
@@ -147,6 +158,7 @@ export function useToolTransfers() {
     }
   }, [supabaseFetch]);
 
+  // Aceitar e importar
   const acceptAndImportTools = useCallback(async (
     transferId: string, recipientId: string, toolIds: string[]
   ): Promise<{ success: boolean; inserted?: number; existing?: number; error?: string }> => {
