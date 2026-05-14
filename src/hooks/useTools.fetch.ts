@@ -10,6 +10,39 @@ const SUPABASE_URL = 'https://cmfgirvgnexkcomhcosm.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Dm-ozWvAve1nkgjEDg_QsA_-gldlMxk';
 
 // ============================================================
+// CATEGORIAS NATIVAS IMUTAVEIS
+// ============================================================
+const NATIVE_CATEGORY_IDS = new Set([
+  'Chatbots',
+  'Imagens',
+  'Vídeos',
+  'Apresentações',
+  'Áudio',
+  'Produtividade',
+  'Desenvolvimento',
+  'PDF',
+]);
+
+const NATIVE_CATEGORY_NAMES = new Set([
+  'chatbots',
+  'imagens',
+  'vídeos',
+  'apresentações',
+  'áudio',
+  'produtividade',
+  'desenvolvimento',
+  'pdf',
+]);
+
+function isNativeCategory(id: string): boolean {
+  return NATIVE_CATEGORY_IDS.has(id);
+}
+
+function isNativeCategoryName(name: string): boolean {
+  return NATIVE_CATEGORY_NAMES.has(name.toLowerCase().trim());
+}
+
+// ============================================================
 // TIPOS
 // ============================================================
 interface Tool {
@@ -342,6 +375,7 @@ export function useTools() {
       } else {
         const toolsData = await toolsResponse.json();
         console.log('[useTools] Tools received:', toolsData?.length || 0);
+        // BLINDAGEM: normalizar category para string, nunca null/undefined
         const normalizedTools = (toolsData || []).map((t: any) => ({
           ...t,
           category: t.category || 'Geral',
@@ -381,26 +415,52 @@ export function useTools() {
         setUserToolsData(userDataMap);
       }
 
-      console.log('[useTools] [STEP 3/4] Fetching categories...');
+      console.log('[useTools] [STEP 3/4] Fetching categories (nativas + personalizadas)...');
       try {
         const catsUrl = `${SUPABASE_URL}/rest/v1/categories?select=*&or=(user_id.eq.${currentUser.id},user_id.is.null)&order=name.asc`;
         const catsResponse = await fetchWithTimeout(catsUrl, { method: 'GET', headers }, 15000);
 
+        // Sempre comecar com as categorias nativas como base
+        const mergedCategories: Category[] = defaultCategories.map(c => ({
+          id: c.id,
+          name: c.name,
+          subcategories: Array.isArray(c.subcategories) ? c.subcategories : [],
+        }));
+
         if (catsResponse.ok) {
           const catsData = await catsResponse.json();
-          console.log('[useTools] Categories received:', catsData?.length || 0);
+          console.log('[useTools] Categories received from Supabase:', catsData?.length || 0);
+
           if (catsData && catsData.length > 0) {
-            setCategories(catsData.map((c: any) => ({
-              id: c.id,
-              name: c.name,
-              subcategories: Array.isArray(c.subcategories) ? c.subcategories : [],
-            })));
+            // Filtrar apenas categorias personalizadas (nao nativas)
+            const customCats = catsData.filter((c: any) => !isNativeCategory(c.id));
+            console.log('[useTools] Custom categories (nao nativas):', customCats.length);
+
+            // Adicionar categorias personalizadas ao merge
+            customCats.forEach((c: any) => {
+              mergedCategories.push({
+                id: c.id,
+                name: c.name,
+                subcategories: Array.isArray(c.subcategories) ? c.subcategories : [],
+              });
+            });
+
+            // Reordenar alfabeticamente
+            mergedCategories.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
           }
         } else {
-          console.log('[useTools] categories table not accessible, using defaults');
+          console.log('[useTools] categories table not accessible, using only defaults');
         }
+
+        setCategories(mergedCategories);
       } catch (e: any) {
         console.log('[useTools] categories fetch error:', e.message);
+        // Em caso de erro, manter apenas as nativas
+        setCategories(defaultCategories.map(c => ({
+          id: c.id,
+          name: c.name,
+          subcategories: Array.isArray(c.subcategories) ? c.subcategories : [],
+        })));
       }
 
       console.log('[useTools] [STEP 4/4] Fetching tool_clicks for user:', currentUser.id);
@@ -629,6 +689,7 @@ export function useTools() {
       return { success: false, message: 'Voce precisa estar logado' };
     }
 
+    // BLINDAGEM: garantir que category seja sempre string (nunca objeto)
     let categoryValue = toolData.category;
     if (typeof categoryValue === 'object' && categoryValue !== null) {
       console.warn('[useTools] category era objeto, convertendo para string:', categoryValue);
@@ -678,6 +739,7 @@ export function useTools() {
       return { success: false, message: 'Voce precisa estar logado' };
     }
 
+    // BLINDAGEM: garantir que category seja sempre string
     let categoryValue = toolData.category;
     if (typeof categoryValue === 'object' && categoryValue !== null) {
       console.warn('[useTools] editTool: category era objeto, convertendo:', categoryValue);
@@ -742,7 +804,7 @@ export function useTools() {
   }, [currentUser?.id, tools]);
 
   // ============================================================
-  // CATEGORY CRUD
+  // CATEGORY CRUD (COM PROTECAO DE CATEGORIAS NATIVAS)
   // ============================================================
   const addCategory = useCallback(async (name: string) => {
     console.log('[useTools] ===== ADD CATEGORY =====');
@@ -751,8 +813,21 @@ export function useTools() {
       return { success: false, message: 'Voce precisa estar logado' };
     }
 
+    // BLOQUEIO: nao permitir criar categoria com nome de nativa
+    if (isNativeCategoryName(name)) {
+      console.warn('[useTools] TENTATIVA BLOQUEADA: criar categoria com nome nativo:', name);
+      return { success: false, message: `A categoria "${name}" é nativa e não pode ser recriada.` };
+    }
+
     try {
       const id = name.toLowerCase().replace(/\s+/g, '-');
+      
+      // BLOQUEIO: nao permitir ID que conflita com nativo
+      if (isNativeCategory(id)) {
+        console.warn('[useTools] TENTATIVA BLOQUEADA: ID conflita com categoria nativa:', id);
+        return { success: false, message: `O ID "${id}" é reservado para uma categoria nativa.` };
+      }
+
       const payload = {
         id,
         name,
@@ -789,6 +864,12 @@ export function useTools() {
       return { success: false, message: 'Voce precisa estar logado' };
     }
 
+    // BLOQUEIO: nao permitir editar categoria nativa
+    if (isNativeCategory(id)) {
+      console.warn('[useTools] TENTATIVA BLOQUEADA: editar categoria nativa:', id);
+      return { success: false, message: `A categoria "${id}" é nativa e não pode ser editada.` };
+    }
+
     try {
       const url = `${SUPABASE_URL}/rest/v1/categories?id=eq.${id}&user_id=eq.${currentUser.id}`;
       const res = await fetchWithTimeout(url, {
@@ -816,6 +897,12 @@ export function useTools() {
 
     if (!currentUser?.id) {
       return { success: false, message: 'Voce precisa estar logado' };
+    }
+
+    // BLOQUEIO: nao permitir deletar categoria nativa
+    if (isNativeCategory(id)) {
+      console.warn('[useTools] TENTATIVA BLOQUEADA: deletar categoria nativa:', id);
+      return { success: false, message: `A categoria "${id}" é nativa e não pode ser excluída.` };
     }
 
     try {
@@ -1105,7 +1192,13 @@ export function useTools() {
       console.error('[useTools] tools nao e array:', tools);
       return [];
     }
+    // DIAGNOSTICO: verificar se normalizacao funcionou
+    const nullCategoryTools = tools.filter((t: Tool) => !t || !t.category);
+    if (nullCategoryTools.length > 0) {
+      console.error('[useTools] FERRAMENTAS COM CATEGORY NULO:', nullCategoryTools.map((t: Tool) => ({ id: t?.id, name: t?.name, category: t?.category })));
+    }
     let result = tools.filter((tool: Tool) => {
+      // BLINDAGEM: pular itens nulos ou sem categoria
       if (!tool || !tool.id) {
         console.warn('[useTools] Ferramenta invalida (sem id):', tool);
         return false;
@@ -1134,12 +1227,13 @@ export function useTools() {
       return true;
     });
 
+    // BLINDAGEM RADICAL: nenhuma ferramenta sem category sai do hook
     const mapped = result
       .filter((tool: Tool) => {
         if (!tool) return false;
         if (!tool.category) {
           console.error('[useTools] FERRAMENTA SEM CATEGORY DESCARTADA:', { id: tool.id, name: tool.name });
-          return false;
+          return false; // DROP: nao passa daqui
         }
         return true;
       })
