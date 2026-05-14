@@ -4,7 +4,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useAdClicks } from '@/hooks/useAdClicks';
+import { sendNotificationToProfile } from '@/hooks/useNotifications';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -17,6 +19,41 @@ import {
 
 const SUPABASE_URL = 'https://cmfgirvgnexkcomhcosm.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Dm-ozWvAve1nkgjEDg_QsA_-gldlMxk';
+
+// ============================================================
+// EXTRAI O JWT DO ADMIN LOGADO DO LOCALSTORAGE DO SUPABASE
+// Necessario para passar pelo RLS em operacoes de escrita
+// ============================================================
+function getAdminToken(): string | null {
+  try {
+    const sessionStr = localStorage.getItem('sb-cmfgirvgnexkcomhcosm-auth-token');
+    if (sessionStr) {
+      const session = JSON.parse(sessionStr);
+      if (session?.access_token) return session.access_token;
+    }
+    const fallbackKeys = Object.keys(localStorage).filter(k =>
+      k.includes('auth') && k.includes('token') && !k.includes('expires')
+    );
+    for (const key of fallbackKeys) {
+      try {
+        const val = JSON.parse(localStorage.getItem(key) || '{}');
+        if (val?.access_token) return val.access_token;
+      } catch { /* ignore */ }
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+// Headers com auth do admin (JWT) — fallback para anon key
+function adminHeaders(contentType = true): Record<string, string> {
+  const token = getAdminToken();
+  const headers: Record<string, string> = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': token ? `Bearer ${token}` : `Bearer ${SUPABASE_KEY}`,
+  };
+  if (contentType) headers['Content-Type'] = 'application/json';
+  return headers;
+}
 
 // ============================================================
 // TYPES
@@ -122,10 +159,10 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   const [showGeneralNotifModal, setShowGeneralNotifModal] = useState(false);
 
   const { clickCounts, fetchMultipleClickCounts, fetchDailyClicks, sendReport } = useAdClicks();
-  const isDark = true; // Simplified - admin panel is always dark
+  const isDark = true;
 
   // ============================================================
-  // LOAD USERS
+  // LOAD USERS — com JWT autenticado
   // ============================================================
   const loadUsers = useCallback(async () => {
     if (!isAdminEmail(currentUserEmail)) { setErrorMsg('Acesso negado.'); return; }
@@ -133,7 +170,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
     try {
       const resp = await fetchWithTimeout(
         `${SUPABASE_URL}/rest/v1/profiles?select=*&order=created_at.desc`,
-        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } },
+        { headers: adminHeaders() },
         15000
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -153,20 +190,19 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   useEffect(() => { if (open) loadUsers(); }, [open, loadUsers]);
 
   // ============================================================
-  // LOAD ADS
+  // LOAD ADS — com JWT autenticado
   // ============================================================
   const loadAds = useCallback(async () => {
     setAdsLoading(true);
     try {
       const resp = await fetchWithTimeout(
         `${SUPABASE_URL}/rest/v1/trending_ads?select=*&order=created_at.desc`,
-        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } },
+        { headers: adminHeaders() },
         15000
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       setAds(data || []);
-      // Fetch click counts for all ads
       if (data?.length > 0) fetchMultipleClickCounts(data.map((a: TrendingAd) => a.id));
     } catch (e: any) {
       console.error('[Admin] [loadAds] Erro:', e);
@@ -177,13 +213,13 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   useEffect(() => { if (open) loadAds(); }, [open, loadAds]);
 
   // ============================================================
-  // LOAD REGISTERED EMAILS
+  // LOAD REGISTERED EMAILS — com JWT autenticado
   // ============================================================
   const loadRegisteredEmails = useCallback(async () => {
     try {
       const resp = await fetchWithTimeout(
         `${SUPABASE_URL}/rest/v1/profiles?select=email`,
-        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } },
+        { headers: adminHeaders() },
         10000
       );
       if (!resp.ok) return;
@@ -199,7 +235,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
     registeredEmails.has(newAdOwnerEmail.trim().toLowerCase()) ? 'valid' : 'invalid';
 
   // ============================================================
-  // ADD ADMIN
+  // ADD ADMIN — com JWT autenticado
   // ============================================================
   const handleAddAdmin = async () => {
     if (!isAdminEmail(currentUserEmail)) { setAddAdminMsg('Acesso negado.'); return; }
@@ -208,7 +244,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
     try {
       const resp = await fetchWithTimeout(
         `${SUPABASE_URL}/rest/v1/profiles?select=id,email&email=eq.${encodeURIComponent(newAdminEmail.trim())}`,
-        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } },
+        { headers: adminHeaders() },
         10000
       );
       if (!resp.ok) throw new Error('Usuario nao encontrado');
@@ -219,10 +255,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
         `${SUPABASE_URL}/rest/v1/profiles?id=eq.${data[0].id}`,
         {
           method: 'PATCH',
-          headers: {
-            'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json', 'Prefer': 'return=minimal',
-          },
+          headers: { ...adminHeaders(), 'Prefer': 'return=minimal' },
           body: JSON.stringify({ role: 'admin', updated_at: new Date().toISOString() }),
         },
         10000
@@ -238,19 +271,14 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   };
 
   // ============================================================
-  // DELETE USER
+  // DELETE USER — com JWT autenticado
   // ============================================================
   const handleDelete = async () => {
     if (!deleteTarget || !isAdminEmail(currentUserEmail)) return;
     try {
-      // 1. Delete from auth (via Edge Function or admin API)
-      // 2. Delete from profiles
       await fetchWithTimeout(
         `${SUPABASE_URL}/rest/v1/profiles?id=eq.${deleteTarget.id}`,
-        {
-          method: 'DELETE',
-          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
-        },
+        { method: 'DELETE', headers: adminHeaders() },
         10000
       );
       setLocalUsers(localUsers.filter((u) => u.id !== deleteTarget.id));
@@ -262,7 +290,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   };
 
   // ============================================================
-  // TOGGLE BLOCK
+  // TOGGLE BLOCK — com JWT autenticado
   // ============================================================
   const handleToggleBlock = async () => {
     if (!blockTarget || !isAdminEmail(currentUserEmail)) return;
@@ -272,10 +300,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
         `${SUPABASE_URL}/rest/v1/profiles?id=eq.${blockTarget.id}`,
         {
           method: 'PATCH',
-          headers: {
-            'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json', 'Prefer': 'return=representation',
-          },
+          headers: { ...adminHeaders(), 'Prefer': 'return=representation' },
           body: JSON.stringify({ is_blocked: newBlocked, updated_at: new Date().toISOString() }),
         },
         10000
@@ -289,7 +314,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   };
 
   // ============================================================
-  // CREATE AD
+  // CREATE AD — com JWT autenticado
   // ============================================================
   const handleCreateAd = async () => {
     if (!newAdTitle.trim() || !newAdTargetUrl.trim()) {
@@ -310,10 +335,9 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
       }
       const resp = await fetchWithTimeout(
         `${SUPABASE_URL}/rest/v1/trending_ads`, {
-          method: 'POST', headers: {
-            'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json', 'Prefer': 'return=representation',
-          }, body: JSON.stringify(body),
+          method: 'POST',
+          headers: { ...adminHeaders(), 'Prefer': 'return=representation' },
+          body: JSON.stringify(body),
         }, 15000,
       );
       if (!resp.ok) {
@@ -323,7 +347,6 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
       const data = await resp.json();
       setAds([data?.[0] || body, ...ads]);
       setAdMsg('✅ Publicacao criada com sucesso!');
-      // Reset form
       setNewAdTitle(''); setNewAdTargetUrl(''); setNewAdImageUrl('');
       setNewAdExpiresAt(''); setNewAdIndeterminate(true);
       setNewAdOwnerEmail('');
@@ -336,14 +359,14 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   };
 
   // ============================================================
-  // DELETE AD
+  // DELETE AD — com JWT autenticado
   // ============================================================
   const handleDeleteAd = async () => {
     if (!deleteAdTarget) return;
     try {
       const resp = await fetchWithTimeout(
         `${SUPABASE_URL}/rest/v1/trending_ads?id=eq.${deleteAdTarget.id}`,
-        { method: 'DELETE', headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } },
+        { method: 'DELETE', headers: adminHeaders() },
         10000,
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -382,7 +405,6 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
-      // Upload to Supabase Storage (simplified — using data URL for now)
       setNewAdImageUrl(base64);
       setAdMsg('✅ Imagem carregada!');
     } catch {
@@ -398,11 +420,9 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
     if (!newAdTargetUrl.trim()) return;
     setIsFetchingPreview(true);
     try {
-      // Try to extract title from URL
       const url = new URL(newAdTargetUrl);
       const domain = url.hostname.replace('www.', '');
       if (!newAdTitle.trim()) setNewAdTitle(domain.charAt(0).toUpperCase() + domain.slice(1));
-      // Try favicon
       if (!newAdImageUrl.trim()) {
         setNewAdImageUrl(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
       }
@@ -423,7 +443,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   };
 
   // ============================================================
-  // RENDER — return starts here
+  // RENDER
   // ============================================================
   if (!isAdminEmail(currentUserEmail)) {
     return (
@@ -522,14 +542,11 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {localUsers.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-slate-800 border border-slate-700"
-                >
+                <div key={user.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-800 border border-slate-700">
                   <div className="flex items-center gap-3">
                     <div className="h-8 w-8 rounded-full bg-violet-600 flex items-center justify-center text-white text-xs font-bold">
-  {user.name?.charAt(0)?.toUpperCase() || 'U'}
-</div>
+                      {user.name?.charAt(0)?.toUpperCase() || 'U'}
+                    </div>
                     <div>
                       <div className="text-sm font-medium text-white">{user.name}</div>
                       <div className="text-xs text-slate-400">{user.email}</div>
@@ -601,10 +618,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                 const clickCount = clickCounts[ad.id] || 0;
 
                 return (
-                  <div
-                    key={ad.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-slate-800 border border-slate-700"
-                  >
+                  <div key={ad.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-800 border border-slate-700">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       {ad.image_url ? (
                         <img src={ad.image_url} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0" />
@@ -673,7 +687,6 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              {/* URL + Fetch */}
               <div className="flex gap-2">
                 <Input
                   placeholder="URL de destino..."
@@ -690,7 +703,6 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                 </Button>
               </div>
 
-              {/* Title */}
               <div>
                 <Label className="text-slate-400">Titulo *</Label>
                 <Input
@@ -701,7 +713,6 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                 />
               </div>
 
-              {/* Owner Email */}
               <div>
                 <Label className="text-slate-400">Responsavel (e-mail) <span className="text-[10px] text-slate-500">(apenas cadastrados)</span></Label>
                 <div className="relative">
@@ -737,7 +748,6 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                 </p>
               </div>
 
-              {/* Image */}
               <div>
                 <Label className="text-slate-400">Imagem</Label>
                 <div className="flex gap-2">
@@ -767,7 +777,6 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                 )}
               </div>
 
-              {/* Expiry */}
               <div>
                 <Label className="text-slate-400">Expiracao</Label>
                 <div className="flex items-center gap-3">
@@ -791,7 +800,6 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                 </div>
               </div>
 
-              {/* Buttons */}
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowAdModal(false)} className="border-slate-700 text-slate-300">
                   Cancelar
@@ -969,8 +977,9 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   );
 }
 
-//const SUPABASE_URL = 'https://cmfgirvgnexkcomhcosm.supabase.co';
-//const SUPABASE_KEY = 'sb_publishable_Dm-ozWvAve1nkgjEDg_QsA_-gldlMxk';
+// ============================================================
+// GENERAL NOTIFICATION MODAL — incorporado no mesmo arquivo
+// ============================================================
 
 interface GeneralNotificationModalProps {
   open: boolean;
@@ -978,7 +987,7 @@ interface GeneralNotificationModalProps {
   theme: 'light' | 'dark';
 }
 
-export function GeneralNotificationModal({ open, onClose, theme }: GeneralNotificationModalProps) {
+function GeneralNotificationModal({ open, onClose, theme }: GeneralNotificationModalProps) {
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -1001,11 +1010,7 @@ export function GeneralNotificationModal({ open, onClose, theme }: GeneralNotifi
       const url = `${SUPABASE_URL}/rest/v1/profiles?select=email`;
       const resp = await fetch(url, {
         method: 'GET',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-        },
+        headers: adminHeaders(),
       });
       if (!resp.ok) return [];
       const data = await resp.json();
@@ -1044,10 +1049,15 @@ export function GeneralNotificationModal({ open, onClose, theme }: GeneralNotifi
     let sent = 0;
     let failed = 0;
 
+    // Enviar notificacao REAL via sendNotificationToProfile (bypass RLS com JWT)
     for (const email of emails) {
-      console.log(`Simulando envio para: ${email}`);
-const ok = true;
-      
+      const ok = await sendNotificationToProfile({
+        ownerEmail: email,
+        title: title.trim(),
+        message: message.trim(),
+        data: { type: 'general_broadcast', sent_by: 'admin' },
+        type: 'system',
+      });
       if (ok) sent++;
       else failed++;
     }
@@ -1158,6 +1168,3 @@ const ok = true;
     </Dialog>
   );
 }
-
-// Import needed for Label
-import { Label } from '@/components/ui/label';
