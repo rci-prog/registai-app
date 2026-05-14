@@ -422,26 +422,63 @@ export function useTools() {
     setError(null);
 
     try {
-      console.log('[useTools] [STEP 1/4] Fetching all tools...');
-      const toolsUrl = `${SUPABASE_URL}/rest/v1/tools?select=*&order=name.asc`;
-      const toolsResponse = await fetchWithTimeout(toolsUrl, {
-        method: 'GET',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-      }, 15000);
-      if (!toolsResponse.ok) {
-        const text = await toolsResponse.text();
-        console.log('[useTools] tools fetch error:', toolsResponse.status, text);
-        setTools([]);
-      } else {
-        const toolsData = await toolsResponse.json();
-        console.log('[useTools] Tools received:', toolsData?.length || 0);
-        // BLINDAGEM: normalizar category para string, nunca null/undefined
-        const normalizedTools = (toolsData || []).map((t: any) => ({
-          ...t,
-          category: t.category || 'Geral',
-        }));
-        setTools(normalizedTools);
+      console.log('[useTools] [STEP 1/4] Fetching user tools (proprias + compartilhadas)...');
+      // BLINDAGEM RADICAL: buscar SOMENTE ferramentas do usuario logado
+      // 1) Ferramentas criadas pelo usuario (created_by = user_id)
+      // 2) Ferramentas compartilhadas com o usuario (via user_tools)
+      const ownToolsUrl = `${SUPABASE_URL}/rest/v1/tools?select=*&created_by=eq.${currentUser.id}&order=name.asc`;
+      const sharedToolsUrl = `${SUPABASE_URL}/rest/v1/user_tools?select=tool_id&user_id=eq.${currentUser.id}`;
+
+      const [ownRes, sharedRes] = await Promise.all([
+        fetchWithTimeout(ownToolsUrl, { method: 'GET', headers }, 15000),
+        fetchWithTimeout(sharedToolsUrl, { method: 'GET', headers }, 15000),
+      ]);
+
+      const ownTools = ownRes.ok ? (await ownRes.json() || []) : [];
+      const sharedLinks = sharedRes.ok ? (await sharedRes.json() || []) : [];
+
+      console.log('[useTools] Ferramentas proprias:', ownTools.length, '| Compartilhadas:', sharedLinks.length);
+
+      // Normalizar ferramentas proprias
+      let allUserTools = ownTools.map((t: any) => ({
+        ...t,
+        category: t.category || 'Geral',
+      }));
+
+      // Buscar detalhes das ferramentas compartilhadas
+      if (sharedLinks.length > 0) {
+        const sharedIds = sharedLinks.map((s: any) => s.tool_id).filter(Boolean);
+        if (sharedIds.length > 0) {
+          // Buscar em lotes de 50 para nao exceder URL length
+          const batchSize = 50;
+          const sharedToolsAll: any[] = [];
+          for (let i = 0; i < sharedIds.length; i += batchSize) {
+            const batch = sharedIds.slice(i, i + batchSize);
+            const idsFilter = batch.map((id: string) => `id.eq.${id}`).join(',');
+            const sharedToolsUrl = `${SUPABASE_URL}/rest/v1/tools?select=*&or=(${idsFilter})&order=name.asc`;
+            const sharedToolsRes = await fetchWithTimeout(sharedToolsUrl, { method: 'GET', headers }, 15000);
+            if (sharedToolsRes.ok) {
+              const batchTools = await sharedToolsRes.json();
+              sharedToolsAll.push(...(batchTools || []).map((t: any) => ({
+                ...t,
+                category: t.category || 'Geral',
+              })));
+            }
+          }
+          // Adicionar apenas as que ainda nao estao na lista (evitar duplicatas)
+          const existingIds = new Set(allUserTools.map((t: any) => t.id));
+          for (const st of sharedToolsAll) {
+            if (!existingIds.has(st.id)) {
+              allUserTools.push(st);
+            }
+          }
+        }
       }
+
+      // Reordenar alfabeticamente
+      allUserTools.sort((a: any, b: any) => a.name.localeCompare(b.name, 'pt-BR'));
+      console.log('[useTools] Total ferramentas do usuario:', allUserTools.length);
+      setTools(allUserTools);
 
       console.log('[useTools] [STEP 2/4] Fetching user_tools for user:', currentUser.id);
       const userToolsUrl = `${SUPABASE_URL}/rest/v1/user_tools?select=id,tool_id,is_favorite,personal_notes,rating&user_id=eq.${currentUser.id}`;
