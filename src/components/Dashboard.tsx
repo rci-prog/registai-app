@@ -16,7 +16,7 @@ import { ToolCard } from './ToolCard';
 import { LoginModal } from './LoginModal';
 import { ShareToolsModal } from './ShareToolsModal';
 import { TransferNotification } from './TransferNotification';
-import { useTools } from '@/hooks/useTools.fetch';
+import { useTools, isNativeCategory } from '@/hooks/useTools.fetch';
 import { useAuth } from '@/contexts/AuthContext';
 // supabase import removido — usando fetch direto para bypass RLS
 import {
@@ -122,13 +122,13 @@ export function Dashboard() {
         const rawBlocked = profileData?.is_blocked;
         const isBlocked = rawBlocked === true || rawBlocked === 'true' || rawBlocked === 1 || rawBlocked === 't';
         if (isBlocked) {
-          console.log('[Dashboard] [verifyUser] 🚫 Usuario BLOQUEADO detectado, fazendo signOut:', currentUser.email);
+          console.log('[Dashboard] [verifyUser] Usuario BLOQUEADO detectado, fazendo signOut:', currentUser.email);
           await logout();
           setLoginError('Sua conta foi suspensa. Entre em contato com o suporte.');
           setIsLoginOpen(true);
           return;
         }
-        console.log('[Dashboard] [verifyUser] ✅ Usuario OK:', currentUser.email);
+        console.log('[Dashboard] [verifyUser] Usuario OK:', currentUser.email);
       } catch (e: any) {
         console.error('[Dashboard] [verifyUser] Erro:', e.message);
       }
@@ -182,13 +182,13 @@ export function Dashboard() {
     return () => window.removeEventListener('tools-changed', handleToolsChanged);
   }, []); // [] = listener criado uma vez so, nunca recriado
 
-  // Detectar erro de auth (bloqueio/deleted) após redirect do Google — VERIFICA NA MONTAGEM
+  // Detectar erro de auth (bloqueio/deleted) apos redirect do Google — VERIFICA NA MONTAGEM
   useEffect(() => {
     const raw = localStorage.getItem('auth_error');
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        // Só usa se for recente (< 30 segundos)
+        // So usa se for recente (< 30 segundos)
         if (Date.now() - parsed.ts < 30000) {
           setLoginError(parsed.msg);
           setIsLoginOpen(true);
@@ -265,15 +265,15 @@ export function Dashboard() {
       
       setNewToolData({
         name: name,
-        description: `Ferramenta de IA acessível em ${url.hostname}`,
+        description: `Ferramenta de IA acessivel em ${url.hostname}`,
         url: autoGenUrl,
         category: categories[0]?.id || 'Chatbots',
-        image_url: `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=128`,
+        image_url: `https://www.google.com/s2/favicons?domain= ${url.hostname}&sz=128`,
       });
       // Mostrar aviso sobre campos que precisam ser personalizados
       setShowScrapeWarning(true);
     } catch {
-      // URL inválida
+      // URL invalida
     }
   };
 
@@ -288,6 +288,8 @@ export function Dashboard() {
     console.log('[Dashboard] addCategory resultado:', result);
     if (result.success) {
       setNewCategoryName('');
+    } else {
+      alert(result.message);
     }
   };
 
@@ -299,6 +301,8 @@ export function Dashboard() {
     if (result.success) {
       setEditingCategory(null);
       setEditCategoryName('');
+    } else {
+      alert(result.message);
     }
   };
 
@@ -319,11 +323,14 @@ export function Dashboard() {
     console.log('[Dashboard] deleteCategory resultado:', result);
     if (result.success) {
       setCategoryToDelete(null);
+    } else {
+      alert(result.message);
+      setCategoryToDelete(null);
     }
   };
 
-  // ======= PROTEÇÃO DE ROTA =======
-  // Se não estiver autenticado, mostra APENAS a tela de login
+  // ======= PROTECAO DE ROTA =======
+  // Se nao estiver autenticado, mostra APENAS a tela de login
   if (!currentUser) {
     // ============================================================
     // DETECTAR REDIRECT DO OAUTH: se URL tem token, estamos em
@@ -356,10 +363,10 @@ export function Dashboard() {
               registAI
             </h1>
             <p className={`mt-2 text-base ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>
-              Catálogo Inteligente de IA
+              Catalogo Inteligente de IA
             </p>
             <p className={`mt-4 text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-gray-400'}`}>
-              Faça login para acessar suas ferramentas e o assistente Regis
+              Faca login para acessar suas ferramentas e o assistente Regis
             </p>
           </div>
           {blockMessage && (
@@ -419,7 +426,7 @@ export function Dashboard() {
             onReset={resetClicks}
           />
 
-          {/* Orçamento - velocímetros */}
+          {/* Orcamento - velocimetros */}
           <BudgetGauges
             subscriptions={subscriptions}
             budget={budget}
@@ -484,7 +491,7 @@ export function Dashboard() {
             <TransferNotification theme={theme} currentUser={currentUser} />
           )}
 
-          {/* Loading Guard — impede renderização prematura */}
+          {/* Loading Guard — impede renderizacao prematura */}
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
@@ -633,7 +640,7 @@ export function Dashboard() {
               Nova Ferramenta
             </DialogTitle>
             <DialogDescription className={theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}>
-              Adicione uma nova ferramenta ao catálogo.
+              Adicione uma nova ferramenta ao catalogo.
             </DialogDescription>
           </DialogHeader>
           
@@ -663,9 +670,9 @@ export function Dashboard() {
             }`}>
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-xs font-semibold">Atenção</p>
+                <p className="text-xs font-semibold">Atencao</p>
                 <p className="text-[11px] mt-0.5">
-                  Ao selecionar a opção de Puxar dados via URL os campos são preenchidos automaticamente, porém, nos campos de <strong>Descrição</strong> e <strong>Categoria</strong> é recomendado alterar a descrição e selecionar a categoria desejada.
+                  Ao selecionar a opcao de Puxar dados via URL os campos sao preenchidos automaticamente, porem, nos campos de <strong>Descricao</strong> e <strong>Categoria</strong> e recomendado alterar a descricao e selecionar a categoria desejada.
                 </p>
               </div>
             </div>
@@ -682,11 +689,11 @@ export function Dashboard() {
               />
             </div>
             <div>
-              <Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Descrição</Label>
+              <Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Descricao</Label>
               <Textarea
                 value={newToolData.description}
                 onChange={(e) => setNewToolData({ ...newToolData, description: e.target.value })}
-                placeholder="Descrição da ferramenta"
+                placeholder="Descricao da ferramenta"
                 className={theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : ''}
               />
             </div>
@@ -777,72 +784,84 @@ export function Dashboard() {
             {/* Categories List */}
             <div className="space-y-2 max-h-64 overflow-y-auto">
               <Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Categorias Existentes</Label>
-              {categories.map((cat) => (
-                <div 
-                  key={cat.id} 
-                  className={`flex items-center justify-between p-3 rounded-lg ${theme === 'dark' ? 'bg-slate-800' : 'bg-gray-50'}`}
-                >
-                  {editingCategory === cat.id ? (
-                    <div className="flex items-center gap-2 flex-1">
-                      <Input
-                        value={editCategoryName}
-                        onChange={(e) => setEditCategoryName(e.target.value)}
-                        className={`flex-1 ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : ''}`}
-                        autoFocus
-                      />
-                      <Button 
-                        size="sm" 
-                        onClick={handleEditCategorySave}
-                        className="bg-violet-600 hover:bg-violet-700"
-                      >
-                        Salvar
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        onClick={() => {
-                          setEditingCategory(null);
-                          setEditCategoryName('');
-                        }}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-3">
-                        <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                          {cat.name}
-                        </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-gray-200 text-gray-500'}`}>
-                          {categoryCounts[cat.id] || 0} ferramentas
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
+              {categories.map((cat) => {
+                const native = isNativeCategory(cat.id);
+                return (
+                  <div
+                    key={cat.id}
+                    className={`flex items-center justify-between p-3 rounded-lg ${theme === 'dark' ? 'bg-slate-800' : 'bg-gray-50'}`}
+                  >
+                    {editingCategory === cat.id ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <Input
+                          value={editCategoryName}
+                          onChange={(e) => setEditCategoryName(e.target.value)}
+                          className={`flex-1 ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : ''}`}
+                          autoFocus
+                        />
+                        <Button
+                          size="sm"
+                          onClick={handleEditCategorySave}
+                          className="bg-violet-600 hover:bg-violet-700"
+                        >
+                          Salvar
+                        </Button>
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => {
-                            setEditingCategory(cat.id);
-                            setEditCategoryName(cat.name);
+                            setEditingCategory(null);
+                            setEditCategoryName('');
                           }}
-                          className={theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}
                         >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setCategoryToDelete(cat.id)}
-                          className="text-red-500 hover:text-red-600"
-                        >
-                          <Trash2 className="w-4 h-4" />
+                          <X className="w-4 h-4" />
                         </Button>
                       </div>
-                    </>
-                  )}
-                </div>
-              ))}
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                            {cat.name}
+                          </span>
+                          {native && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${theme === 'dark' ? 'bg-amber-900/30 text-amber-400 border border-amber-800/50' : 'bg-amber-100 text-amber-700 border border-amber-300'}`}>
+                              Nativa
+                            </span>
+                          )}
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-gray-200 text-gray-500'}`}>
+                            {categoryCounts[cat.id] || 0} ferramentas
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {!native && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setEditingCategory(cat.id);
+                                  setEditCategoryName(cat.name);
+                                }}
+                                className={theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setCategoryToDelete(cat.id)}
+                                className="text-red-500 hover:text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </DialogContent>
@@ -853,10 +872,10 @@ export function Dashboard() {
         <AlertDialogContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}>
           <AlertDialogHeader>
             <AlertDialogTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-              Confirmar exclusão
+              Confirmar exclusao
             </AlertDialogTitle>
             <AlertDialogDescription className={theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}>
-              Tem certeza que deseja excluir esta categoria? As ferramentas associadas não serão excluídas, mas ficarão sem categoria.
+              Tem certeza que deseja excluir esta categoria? As ferramentas associadas nao serao excluidas, mas ficarao sem categoria.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -879,7 +898,7 @@ export function Dashboard() {
         <DialogContent className={`max-w-sm ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}`}>
           <DialogHeader>
             <DialogTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-              Definir Orçamento
+              Definir Orcamento
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 pt-2">
