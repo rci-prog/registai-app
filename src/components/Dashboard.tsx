@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Grid3X3, List, Plus, Sparkles, Settings, Trash2, Edit, X, AlertCircle, RefreshCw, Loader2, Share2 } from 'lucide-react';
 import { Header } from './Header';
@@ -167,15 +167,20 @@ export function Dashboard() {
   const [editCategoryName, setEditCategoryName] = useState('');
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
 
-  // Escutar evento de transferencia aceita -> refetch ferramentas
+    // Escutar evento de transferencia aceita -> refetch ferramentas
+  // CORRECAO: useRef garante que sempre chamamos a versao MAIS RECENTE de refreshTools
+  // sem recriar o listener a cada render (evita referencia stale)
+  const refreshToolsRef = useRef(refreshTools);
+  refreshToolsRef.current = refreshTools;
+
   useEffect(() => {
     const handleToolsChanged = () => {
       console.log('[Dashboard] Evento tools-changed recebido, refetching...');
-      refreshTools();
+      refreshToolsRef.current();
     };
     window.addEventListener('tools-changed', handleToolsChanged);
     return () => window.removeEventListener('tools-changed', handleToolsChanged);
-  }, [refreshTools]);
+  }, []); // [] = listener criado uma vez so, nunca recriado
 
   // Detectar erro de auth (bloqueio/deleted) após redirect do Google — VERIFICA NA MONTAGEM
   useEffect(() => {
