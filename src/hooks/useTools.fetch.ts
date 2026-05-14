@@ -108,23 +108,51 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeout = 100
 // TOKEN JWT DO USUARIO LOGADO (necessario para passar RLS)
 // ============================================================
 function getUserToken(): string | null {
-  try {
-    const raw = localStorage.getItem('sb-cmfgirvgnexkcomhcosm-auth-token');
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed?.access_token || null;
-  } catch {
-    return null;
+  const keys = [
+    'sb-cmfgirvgnexkcomhcosm-auth-token',
+    'sb-auth-token',
+    'supabase.auth.token',
+    'sb-127.auth.token',
+  ];
+  for (const key of keys) {
+    try {
+      const raw = localStorage.getItem(key) || sessionStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      const token = parsed?.access_token || parsed?.token || null;
+      if (token) {
+        console.log('[getUserToken] Token encontrado na chave:', key);
+        return token;
+      }
+    } catch {
+      // tentar proxima chave
+    }
   }
+  // DEBUG: listar todas as chaves do localStorage que contem "auth" ou "token"
+  console.log('[getUserToken] DEBUG - Chaves no localStorage:');
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && (k.includes('auth') || k.includes('token'))) {
+      console.log('  -', k);
+    }
+  }
+  console.log('[getUserToken] Nenhum token encontrado nas chaves:', keys);
+  return null;
 }
 
 function authHeaders(): Record<string, string> {
   const userToken = getUserToken();
-  return {
+  const headers: Record<string, string> = {
     'apikey': SUPABASE_KEY,
-    'Authorization': userToken ? `Bearer ${userToken}` : `Bearer ${SUPABASE_KEY}`,
     'Content-Type': 'application/json',
   };
+  if (userToken) {
+    headers['Authorization'] = `Bearer ${userToken}`;
+  } else {
+    console.warn('[authHeaders] AVISO: usando API key publica (sem token de usuario)');
+    headers['Authorization'] = `Bearer ${SUPABASE_KEY}`;
+  }
+  return headers;
 }
 
 // ============================================================
