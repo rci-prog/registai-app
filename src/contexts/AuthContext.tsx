@@ -220,7 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabaseAuth.auth.signUp({
         email,
         password,
-        options: { data: { full_name: name }, emailRedirectTo: undefined },
+        options: { data: { full_name: name }, emailRedirectTo: 'https://www.registai.com.br' },
       });
       // Desabilitar auto-login: se nao tem session = usuario existente, fazer signOut
       const { data: sessionData } = await supabaseAuth.auth.getSession();
@@ -290,16 +290,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: true, message: 'Conta criada, mas erro ao salvar perfil.' };
       }
 
-      const user: User = {
-        id: data.user.id, email, name, avatar: '',
-        role: isAdminUser ? 'admin' : 'user',
-        createdAt: new Date(data.user.created_at || Date.now()),
-      };
-      setCurrentUser(user);
-      saveAuth(user);
-      setProfile({ id: data.user.id, email, name, avatar: '', role: isAdminUser ? 'admin' : 'user', theme: 'dark' });
-      console.log('[Auth] [register] ===== SUCESSO =====');
-      return { success: true, message: 'Conta criada com sucesso!' };
+      // >>> SIGNOUT IMEDIATO para forcar confirmacao de email <<<
+      await supabaseAuth.auth.signOut();
+      clearAuth();
+      console.log('[Auth] [register] ===== SUCESSO (signOut para confirmacao de email) =====');
+      return { success: true, message: 'Cadastro realizado! Verifique seu e-mail para confirmar a conta.' };
     } catch (error: any) {
       console.error('[Auth] [register] ===== ERRO =====', error);
       return { success: false, message: error?.message || 'Erro ao criar conta.' };
@@ -398,6 +393,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const init = async () => {
       console.log('[Auth] ===== Init =====');
+
+      // >>> DETECTAR CALLBACK DE RECUPERACAO DE SENHA <<<
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('reset_password') === 'true') {
+        console.log('[Auth] [init] Detectado ?reset_password=true — aguardando Supabase processar recovery token...');
+        // Aguarda 2 segundos para o Supabase processar o recovery token
+        await new Promise(r => setTimeout(r, 2000));
+        const { data: { session } } = await supabaseAuth.auth.getSession();
+        if (session?.user) {
+          console.log('[Auth] [init] Sessao de recovery confirmada. Disparando evento open-reset-password-modal...');
+          window.dispatchEvent(new Event('open-reset-password-modal'));
+        } else {
+          console.warn('[Auth] [init] Nenhuma sessao de recovery encontrada apos delay.');
+        }
+        // Limpar parametro da URL sem recarregar
+        const newUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState(null, '', newUrl);
+        setIsLoading(false);
+        return;
+      }
 
       // 1. Verifica se Supabase ja processou OAuth (detectSessionInUrl)
       const { data: { session } } = await supabaseAuth.auth.getSession();
