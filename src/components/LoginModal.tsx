@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Lock, Mail, CheckCircle, Eye, EyeOff, ArrowLeft, KeyRound, HelpCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { SupportModal } from '@/components/SupportModal';
-import { supabaseAuth } from '@/lib/supabase-simple';
+import { supabase } from '@/lib/supabase';
 
 interface LoginModalProps {
   open: boolean;
@@ -94,7 +94,7 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     if (newPassword !== confirmNewPassword) { setError('As senhas nao coincidem.'); return; }
     setIsLoading(true);
     try {
-      const { error } = await supabaseAuth.auth.updateUser({ password: newPassword });
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       setPasswordUpdated(true);
       setNewPassword('');
@@ -236,6 +236,12 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
             <p className="text-sm text-slate-400">
               {registerMessage}
             </p>
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-400 text-left">
+                Caso nao encontre o e-mail na sua Caixa de Entrada em instantes, por favor verifique sua pasta de Spam ou Lixo Eletronico.
+              </p>
+            </div>
             <Button
               onClick={() => { setRegisterSuccess(false); setActiveTab('login'); }}
               className="w-full bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-xl font-semibold text-base"
@@ -327,6 +333,12 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
                   Link de recuperacao enviado!<br/>
                   Verifique sua caixa de entrada.
                 </p>
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 mx-auto max-w-xs">
+                  <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-400 text-left">
+                    Caso nao encontre o e-mail na sua Caixa de Entrada em instantes, por favor verifique sua pasta de Spam ou Lixo Eletronico.
+                  </p>
+                </div>
                 <Button 
                   variant="outline" 
                   onClick={() => { setShowForgotPassword(false); setResetSent(false); setResetEmail(''); }}
@@ -445,7 +457,7 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
                     <Input
                       id="loginPassword"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="********"
+                      placeholder="••••••••"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
                       className="pl-10 pr-10 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus:border-violet-500"
@@ -562,7 +574,7 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
                     <Input
                       id="registerPassword"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="********"
+                      placeholder="••••••••"
                       value={registerPassword}
                       onChange={(e) => setRegisterPassword(e.target.value)}
                       className="pl-10 pr-10 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus:border-violet-500"
@@ -584,7 +596,7 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
                     <Input
                       id="confirmPassword"
                       type={showConfirmPassword ? 'text' : 'password'}
-                      placeholder="********"
+                      placeholder="••••••••"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="pl-10 pr-10 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus:border-violet-500"
