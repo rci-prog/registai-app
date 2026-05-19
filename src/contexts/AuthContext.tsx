@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { supabaseAuth, saveAuth, clearAuth, getAuth } from '@/lib/supabase-simple';
+import { saveAuth, clearAuth, getAuth } from '@/lib/supabase-simple';
 import type { User } from '@/types';
 
 interface Profile {
@@ -121,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('[Auth] [fetchProfile] Bloqueio check (fetch direto):', profileData.email, 'raw:', rawBlocked, 'bloqueado:', isBlocked);
           if (isBlocked) {
             console.log('[Auth] [fetchProfile] 🚫 Usuario BLOQUEADO:', profileData.email);
-            await supabaseAuth.auth.signOut();
+            await supabase.auth.signOut();
             clearAuth();
             setCurrentUserRef.current(null);
             setProfileRef.current(null);
@@ -167,20 +167,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
     try {
       console.log('[Auth] [login] Tentando login:', email);
-      const { data, error } = await supabaseAuth.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) return { success: false, message: error.message };
       if (!data.user) return { success: false, message: 'Erro ao fazer login.' };
 
       const isBlocked = await checkUserBlocked(data.user.id);
       if (isBlocked) {
-        await supabaseAuth.auth.signOut();
+        await supabase.auth.signOut();
         clearAuth();
         return { success: false, message: 'Sua conta foi suspensa. Entre em contato com o suporte em suporte@registai.com.br' };
       }
 
       const { data: profileData } = await supabase.from('profiles').select('id').eq('id', data.user.id).maybeSingle();
       if (!profileData) {
-        await supabaseAuth.auth.signOut();
+        await supabase.auth.signOut();
         clearAuth();
         return { success: false, message: 'Esta conta foi removida. Cadastre-se novamente ou entre em contato com suporte@registai.com.br' };
       }
@@ -215,19 +215,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[Auth] [register] 2. Profile antigo deletado');
       }
 
-      // 2. signUp (auto-login desabilitado para nao criar sessao em usuario existente)
+      // 2. signUp com confirmacao por e-mail habilitada
       console.log('[Auth] [register] 3. Chamando signUp...');
-      const { data, error } = await supabaseAuth.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: name }, emailRedirectTo: 'https://www.registai.com.br' },
+        options: {
+          data: { full_name: name },
+          emailRedirectTo: 'https://www.registai.com.br',
+        },
       });
-      // Desabilitar auto-login: se nao tem session = usuario existente, fazer signOut
-      const { data: sessionData } = await supabaseAuth.auth.getSession();
-      if (sessionData.session && !data.session) {
-        console.log('[Auth] [register] signUp criou sessao inesperada, fazendo signOut...');
-        await supabaseAuth.auth.signOut();
-      }
+      // Desabilitar auto-login: fazer signOut imediatamente apos cadastro
+      // para garantir que o usuario so acesse apos confirmar o e-mail
+      await supabase.auth.signOut();
       console.log('[Auth] [register] 4. signUp retornou:', {
         hasUser: !!data.user,
         hasSession: !!data.session,
@@ -246,13 +246,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, message: 'Erro ao criar conta.' };
       }
 
-      // 3. Sem session = email ja existe no Auth → tentar login com senha fornecida
+      // 3. Sem session = email ja existe no Auth
       if (!data.session) {
-        console.log('[Auth] [register] 5. Email ja existe. Tentando login com senha fornecida...');
-        const { data: loginData, error: loginError } = await supabaseAuth.auth.signInWithPassword({ email, password });
+        // Verificar se o profile existe (conta ativa vs. deletada)
+        const { data: profileCheck } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
+        console.log('[Auth] [register] 5. Profile check:', profileCheck ? 'ATIVO' : 'DELETADO');
+
+        if (!profileCheck) {
+          // CONTA DELETADA: auth user existe mas profile foi removido
+          console.log('[Auth] [register] 5b. Conta deletada detectada. Tentando reativacao...');
+          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+          if (loginError || !loginData.user) {
+            console.log('[Auth] [register] 6. Reativacao falhou (senha incorreta):', loginError?.message);
+            return {
+              success: false,
+              message: 'Esta conta foi removida anteriormente. Para recuperar o acesso com este e-mail, use a opcao "Esqueci a senha" na tela de login. Para criar uma conta nova, utilize um e-mail diferente.',
+            };
+          }
+          // Login OK — recriar profile automaticamente (reativacao da conta)
+          console.log('[Auth] [register] 7. Reativacao OK. Recriando profile...');
+          const isAdminUser = email === ADMIN_EMAIL;
+          const recreatedProfile = {
+            id: loginData.user.id,
+            email,
+            full_name: loginData.user.user_metadata?.full_name || name || email.split('@')[0],
+            avatar_url: loginData.user.user_metadata?.avatar_url || '',
+            role: isAdminUser ? 'admin' : 'user',
+            theme: 'dark',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          await supabase.from('profiles').insert(recreatedProfile);
+          const user: User = {
+            id: loginData.user.id,
+            email: loginData.user.email || email,
+            name: recreatedProfile.full_name,
+            avatar: recreatedProfile.avatar_url,
+            role: isAdminUser ? 'admin' : 'user',
+            createdAt: new Date(loginData.user.created_at),
+          };
+          setCurrentUser(user);
+          saveAuth(user);
+          fetchProfile(loginData.user.id);
+          return { success: true, message: 'Conta reativada com sucesso! Bem-vindo de volta.' };
+        }
+
+        // CONTA ATIVA: tentar login com a senha fornecida
+        console.log('[Auth] [register] 5c. Conta ativa. Tentando login...');
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
         if (loginError || !loginData.user) {
           console.log('[Auth] [register] 6. Login falhou:', loginError?.message);
-          return { success: false, message: 'Este email ja esta cadastrado. Use a opcao "Esqueci a senha" na tela de login ou entre com sua senha correta.' };
+          return { success: false, message: 'Este e-mail ja esta cadastrado. Use a opcao "Esqueci a senha" na tela de login ou entre com sua senha correta.' };
         }
         // Login funcionou — entra com a conta existente
         console.log('[Auth] [register] 7. Login OK com credenciais existentes');
@@ -290,11 +334,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: true, message: 'Conta criada, mas erro ao salvar perfil.' };
       }
 
-      // >>> SIGNOUT IMEDIATO para forcar confirmacao de email <<<
-      await supabaseAuth.auth.signOut();
-      clearAuth();
-      console.log('[Auth] [register] ===== SUCESSO (signOut para confirmacao de email) =====');
-      return { success: true, message: 'Cadastro realizado! Verifique seu e-mail para confirmar a conta.' };
+      const user: User = {
+        id: data.user.id, email, name, avatar: '',
+        role: isAdminUser ? 'admin' : 'user',
+        createdAt: new Date(data.user.created_at || Date.now()),
+      };
+      setCurrentUser(user);
+      saveAuth(user);
+      setProfile({ id: data.user.id, email, name, avatar: '', role: isAdminUser ? 'admin' : 'user', theme: 'dark' });
+      console.log('[Auth] [register] ===== SUCESSO =====');
+      return { success: true, message: 'Conta criada! Verifique seu e-mail para confirmar a conta antes de fazer login.' };
     } catch (error: any) {
       console.error('[Auth] [register] ===== ERRO =====', error);
       return { success: false, message: error?.message || 'Erro ao criar conta.' };
@@ -316,7 +365,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await supabase.from('tool_transfers').delete().eq('sender_id', userId);
       await supabase.from('tool_transfers').delete().eq('recipient_id', userId);
       await supabase.from('profiles').delete().eq('id', userId);
-      await supabaseAuth.auth.signOut();
+      await supabase.auth.signOut();
       clearAuth();
       setCurrentUser(null);
       setProfile(null);
@@ -329,7 +378,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await supabaseAuth.auth.signOut();
+    await supabase.auth.signOut();
     clearAuth();
     setCurrentUser(null);
     setProfile(null);
@@ -349,14 +398,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loginWithGoogle = useCallback(async () => {
-    const { data, error } = await supabaseAuth.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
+    const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
     if (error) return { success: false, message: error.message };
     if (data.url) window.location.href = data.url;
     return { success: true, message: 'Redirecionando...' };
   }, []);
 
   const resetPassword = useCallback(async (email: string) => {
-    const { error } = await supabaseAuth.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/?reset_password=true` });
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/?reset_password=true` });
     if (error) return { success: false, message: error.message };
     return { success: true, message: 'Link de redefinicao enviado!' };
   }, []);
@@ -371,7 +420,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   }, []);
   const updatePassword = useCallback(async (_currentPassword: string, newPassword: string) => {
-    const { error } = await supabaseAuth.auth.updateUser({ password: newPassword });
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return { success: false, message: error.message };
     return { success: true, message: 'Senha atualizada!' };
   }, []);
@@ -387,6 +436,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data?.map(item => item.tool_id) || [];
   }, []);
 
+  // verifyNotBlocked removido — verificacao de bloqueio agora eh inline no handleUserSession
+
   // ============================================================
   // INICIALIZACAO — Restaurar sessao (cache ou OAuth)
   // ============================================================
@@ -394,28 +445,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const init = async () => {
       console.log('[Auth] ===== Init =====');
 
-      // >>> DETECTAR CALLBACK DE RECUPERACAO DE SENHA <<<
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('reset_password') === 'true') {
-        console.log('[Auth] [init] Detectado ?reset_password=true — aguardando Supabase processar recovery token...');
-        // Aguarda 2 segundos para o Supabase processar o recovery token
-        await new Promise(r => setTimeout(r, 2000));
-        const { data: { session } } = await supabaseAuth.auth.getSession();
-        if (session?.user) {
-          console.log('[Auth] [init] Sessao de recovery confirmada. Disparando evento open-reset-password-modal...');
-          window.dispatchEvent(new Event('open-reset-password-modal'));
-        } else {
-          console.warn('[Auth] [init] Nenhuma sessao de recovery encontrada apos delay.');
-        }
-        // Limpar parametro da URL sem recarregar
-        const newUrl = window.location.pathname + window.location.hash;
-        window.history.replaceState(null, '', newUrl);
-        setIsLoading(false);
-        return;
-      }
-
       // 1. Verifica se Supabase ja processou OAuth (detectSessionInUrl)
-      const { data: { session } } = await supabaseAuth.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         console.log('[Auth] Sessao OAuth/Supabase encontrada:', session.user.email);
         // Verifica bloqueio antes de setar usuario
@@ -430,7 +461,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const isBlocked = raw === true || raw === 'true' || raw === 1 || raw === 't';
             if (isBlocked) {
               console.log('[Auth] 🚫 OAuth usuario BLOQUEADO:', session.user.email);
-              await supabaseAuth.auth.signOut();
+              await supabase.auth.signOut();
               clearAuth();
               setCurrentUser(null);
               setProfile(null);
@@ -449,11 +480,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: profileCheck } = await supabase.from('profiles').select('id').eq('id', session.user.id).maybeSingle();
         if (!profileCheck) {
           console.log('[Auth] Sessao encontrada mas profile nao existe (conta deletada):', session.user.email);
-          await supabaseAuth.auth.signOut();
+          await supabase.auth.signOut();
           clearAuth();
           setCurrentUser(null);
           setProfile(null);
           setIsLoading(false);
+          // Limpa hash do OAuth
           if (window.location.hash.includes('access_token=')) {
             window.history.replaceState(null, '', window.location.pathname + window.location.search);
           }
@@ -475,6 +507,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fetchProfile(session.user.id);
         setBlockMessage(null);
         setIsLoading(false);
+        // Limpa hash do OAuth apos login bem-sucedido
         if (window.location.hash.includes('access_token=')) {
           window.history.replaceState(null, '', window.location.pathname + window.location.search);
         }
@@ -493,6 +526,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     };
 
+    // Verificar se URL tem ?reset_password=true (callback de recuperacao de senha)
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('reset_password') === 'true') {
+      console.log('[Auth] Detectado ?reset_password=true — aguardando sessao de recovery...');
+      // Aguarda o Supabase processar o token do hash (#access_token=...&type=recovery)
+      setTimeout(async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          console.log('[Auth] Sessao de recovery detectada, abrindo modal de nova senha');
+          window.dispatchEvent(new CustomEvent('open-reset-password-modal'));
+        } else {
+          console.log('[Auth] Nenhuma sessao de recovery encontrada');
+        }
+      }, 500);
+    }
+
     init();
   }, [fetchProfile]);
 
@@ -500,7 +549,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // onAuthStateChange — backup para logins futuros
   // ============================================================
   useEffect(() => {
-    const { data: { subscription } } = supabaseAuth.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('[Auth] [onAuthStateChange]', event, session?.user?.email || 'no user');
 
       if (event === 'SIGNED_IN' && session?.user) {
@@ -512,6 +561,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { data: profileCheck } = await supabase.from('profiles').select('id').eq('id', session.user!.id).maybeSingle();
           if (!profileCheck) {
             console.log('[Auth] [SIGNED_IN] Profile nao encontrado (conta deletada), NAO salvando cache:', session.user!.email);
+            // NAO faz signOut aqui — deixa o login() gerenciar isso
             return;
           }
 
