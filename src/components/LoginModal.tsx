@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Lock, Mail, CheckCircle, Eye, EyeOff, ArrowLeft, KeyRound, HelpCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { SupportModal } from '@/components/SupportModal';
-import { supabase } from '@/lib/supabase';
 
 interface LoginModalProps {
   open: boolean;
@@ -16,7 +15,7 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
-  const { login, loginWithGoogle, register, resetPassword } = useAuth();
+  const { login, loginWithGoogle, register, resetPassword, updatePassword } = useAuth();
   
   const [activeTab, setActiveTab] = useState('login');
   const [loginEmail, setLoginEmail] = useState('');
@@ -94,11 +93,14 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     if (newPassword !== confirmNewPassword) { setError('As senhas nao coincidem.'); return; }
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
-      setPasswordUpdated(true);
-      setNewPassword('');
-      setConfirmNewPassword('');
+      const result = await updatePassword('', newPassword);
+      if (!result.success) {
+        setError(result.message || 'Erro ao atualizar senha.');
+      } else {
+        setPasswordUpdated(true);
+        setNewPassword('');
+        setConfirmNewPassword('');
+      }
     } catch (err: any) {
       setError(err.message || 'Erro ao atualizar senha.');
     }
