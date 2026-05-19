@@ -225,9 +225,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           emailRedirectTo: 'https://www.registai.com.br',
         },
       });
-      // Desabilitar auto-login: fazer signOut imediatamente apos cadastro
-      // para garantir que o usuario so acesse apos confirmar o e-mail
+
+      // Sempre fazer signOut apos signUp para garantir que o usuario
+      // so acesse apos confirmar o e-mail (evita auto-login indesejado)
       await supabase.auth.signOut();
+      clearAuth();
+
       console.log('[Auth] [register] 4. signUp retornou:', {
         hasUser: !!data.user,
         hasSession: !!data.session,
@@ -314,7 +317,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: true, message: 'Login realizado com sucesso!' };
       }
 
-      // 4. Novo usuario → criar profile
+      // 4. Novo usuario — criar profile
       console.log('[Auth] [register] 5. Novo usuario. ID:', data.user.id);
       const isAdminUser = email === ADMIN_EMAIL;
       const newProfile = {
@@ -436,8 +439,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data?.map(item => item.tool_id) || [];
   }, []);
 
-  // verifyNotBlocked removido — verificacao de bloqueio agora eh inline no handleUserSession
-
   // ============================================================
   // INICIALIZACAO — Restaurar sessao (cache ou OAuth)
   // ============================================================
@@ -445,8 +446,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const init = async () => {
       console.log('[Auth] ===== Init =====');
 
-      // 1. Verifica se Supabase ja processou OAuth (detectSessionInUrl)
       const { data: { session } } = await supabase.auth.getSession();
+
+      // >>> PROTECAO FLUXO DE RECUPERACAO DE SENHA <<<
+      // Se a URL indica que viemos de um link de recovery, NUNCA destruir a
+      // sessao mesmo que o profile esteja ausente (conta deletada).
+      const isRecoveryFlow = new URLSearchParams(window.location.search).get('reset_password') === 'true';
+      if (isRecoveryFlow && session?.user) {
+        console.log('[Auth] [init] 🔒 Fluxo de RECOVERY detectado — sessao preservada, pulando verificacoes de profile/bloqueio');
+        setIsLoading(false);
+        return;
+      }
+
       if (session?.user) {
         console.log('[Auth] Sessao OAuth/Supabase encontrada:', session.user.email);
         // Verifica bloqueio antes de setar usuario
@@ -560,7 +571,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('[Auth] [onAuthStateChange]', event, session?.user?.email || 'no user');
 
+      // >>> PROTECAO FLUXO DE RECUPERACAO DE SENHA <<<
+      // PASSWORD_RECOVERY é disparado pelo Supabase quando processa o link
+      // de redefinicao. NUNCA destruir a sessao neste momento.
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log('[Auth] [onAuthStateChange] 🔒 PASSWORD_RECOVERY detectado — ignorando verificacoes de profile');
+        return;
+      }
+
       if (event === 'SIGNED_IN' && session?.user) {
+        // Verifica se estamos em fluxo de recovery antes de verificar profile
+        const isRecoveryFlow = new URLSearchParams(window.location.search).get('reset_password') === 'true';
+        if (isRecoveryFlow) {
+          console.log('[Auth] [SIGNED_IN] 🔒 Fluxo de RECOVERY — ignorando verificacao de profile, mantendo sessao');
+          return;
+        }
+
         // Verifica profile em background — NAO salva cache se profile nao existe
         (async () => {
           if (getAuth()?.id === session.user!.id) return; // ja tem cache
