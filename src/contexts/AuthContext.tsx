@@ -526,20 +526,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     };
 
-    // Verificar se URL tem ?reset_password=true (callback de recuperacao de senha)
+    // >>> DETECTAR CALLBACK DE RECUPERACAO DE SENHA <<<
     const params = new URLSearchParams(window.location.search);
     if (params.get('reset_password') === 'true') {
-      console.log('[Auth] Detectado ?reset_password=true — aguardando sessao de recovery...');
-      // Aguarda o Supabase processar o token do hash (#access_token=...&type=recovery)
+      console.log('[Auth] Detectado ?reset_password=true — aguardando Supabase processar recovery token...');
+      // Aguarda 2 segundos para o Supabase processar o token do hash (#access_token=...&type=recovery)
       setTimeout(async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          console.log('[Auth] Sessao de recovery detectada, abrindo modal de nova senha');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          console.warn('[Auth] Erro ao obter sessao de recovery:', sessionError.message);
+        }
+        if (session?.user) {
+          console.log('[Auth] ✅ Sessao de recovery confirmada para:', session.user.email);
           window.dispatchEvent(new CustomEvent('open-reset-password-modal'));
         } else {
-          console.log('[Auth] Nenhuma sessao de recovery encontrada');
+          console.warn('[Auth] ❌ Nenhuma sessao de recovery encontrada apos delay');
         }
-      }, 500);
+        // Limpar hash de recovery da URL sem recarregar
+        if (window.location.hash.includes('access_token=') || window.location.hash.includes('type=recovery')) {
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          console.log('[Auth] Hash de recovery limpo da URL');
+        }
+      }, 2000);
     }
 
     init();
