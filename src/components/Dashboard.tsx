@@ -132,12 +132,12 @@ useEffect(() => {
         console.log('[Dashboard] [verifyUser] Resultado:', currentUser.email, 'is_blocked:', profileData?.is_blocked, 'existe:', !!profileData);
         
         // --- TRAVA DE REATIVAÇÃO APÓS EXCLUSÃO ---
-        const acabouDeDeletar = localStorage.getItem('registai_conta_deletada_reciente') === 'true';
+        const acabouDeDeletar = sessionStorage.getItem('registai_conta_deletada_reciente') === 'true';
         const provider = currentUser?.app_metadata?.provider || currentUser?.identities?.[0]?.provider;
 
         if (acabouDeDeletar && provider === 'google') {
-          console.log('[Dashboard] [verifyUser] 🔄 Reativação recente detectada via marcador local!');
-          localStorage.removeItem('registai_conta_deletada_reciente');
+          console.log('[Dashboard] [verifyUser] 🔄 Reativação recente detectada via sessionStorage!');
+          sessionStorage.removeItem('registai_conta_deletada_reciente');
           await logout();
           setLoginError('Conta reativada com sucesso! Faça login novamente para aceitar os termos.');
           setIsLoginOpen(true);
