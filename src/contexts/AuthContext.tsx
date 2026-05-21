@@ -576,8 +576,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   }, []);
   const updatePassword = useCallback(async (_currentPassword: string, newPassword: string) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const recoveryEmail = sessionData?.session?.user?.email || '';
+    
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return { success: false, message: error.message };
+    
+    // Se profile nao existe (conta deletada em recovery), reativar via upsert
+    if (recoveryEmail) {
+      const { data: profileCheck } = await supabase.from('profiles').select('id').eq('email', recoveryEmail).maybeSingle();
+      if (!profileCheck) {
+        console.log('[Auth] [updatePassword] Profile ausente apos recovery — reativando...');
+        const userId = sessionData!.session!.user!.id;
+        const isAdminUser = recoveryEmail === ADMIN_EMAIL;
+        const name = sessionData!.session!.user!.user_metadata?.full_name || recoveryEmail.split('@')[0];
+        const avatar = sessionData!.session!.user!.user_metadata?.avatar_url || '';
+        await supabase.from('profiles').upsert({
+          id: userId,
+          email: recoveryEmail,
+          full_name: name,
+          avatar_url: avatar,
+          role: isAdminUser ? 'admin' : 'user',
+          theme: 'dark',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id', ignoreDuplicates: false });
+        setNeedsOnboarding(true);
+        console.log('[Auth] [updatePassword] ✅ Profile reativado apos recovery');
+      }
+    }
+    
     return { success: true, message: 'Senha atualizada!' };
   }, []);
   const updateTheme = useCallback((_newTheme: 'light' | 'dark') => {
@@ -728,10 +756,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (event === 'SIGNED_IN' && session?.user) {
+            if (event === 'SIGNED_IN' && session?.user) {
+        // Se estamos em sessao de recovery (apos clicar no link do e-mail),
+        // NUNCA verificar profile nem dar signOut — deixar o usuario trocar a senha
         const isRecoveryFlow = new URLSearchParams(window.location.search).get('reset_password') === 'true';
-        if (isRecoveryFlow) {
-          console.log('[Auth] [SIGNED_IN] 🔒 RECOVERY — ignorando verificacao');
+        const isRecoveryHash = window.location.hash.includes('type=recovery') || window.location.hash.includes('access_token=');
+        if (isRecoveryFlow || isRecoveryHash) {
+          console.log('[Auth] [SIGNED_IN] 🔒 RECOVERY — ignorando verificacao de profile');
           return;
         }
 
