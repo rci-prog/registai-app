@@ -100,13 +100,25 @@ export function Dashboard() {
       if (!currentUser?.id) return;
       console.log('[Dashboard] [verifyUser] Verificando usuario:', currentUser.email);
       try {
-        // 1. Pegamos a sessão direto do Supabase para checar o status real do e-mail
-        const { data: { session } } = await supabase.auth.getSession();
-        const isEmailConfirmed = !!session?.user?.email_confirmed_at;
+        // 1. Pegamos os dados da sessão guardados pelo próprio Supabase Auth no localStorage
+        // Isso evita precisar do objeto global 'supabase' e não quebra seu bypass de RLS
+        const storageKey = Object.keys(localStorage).find(key => key.startsWith('sb-') && key.endsWith('-auth-token'));
+        let isEmailConfirmed = true; // Por padrão assume confirmado se não achar no storage
+
+        if (storageKey) {
+          try {
+            const sessionData = JSON.parse(localStorage.getItem(storageKey) || '{}');
+            if (sessionData?.user) {
+              isEmailConfirmed = !!sessionData.user.email_confirmed_at;
+            }
+          } catch (err) {
+            console.error('[Dashboard] [verifyUser] Erro ao ler token do localStorage:', err);
+          }
+        }
 
         // Se o e-mail NÃO está confirmado, ele é um usuário pendente de verificação.
         // Não podemos tratá-lo como "deletado"!
-        if (session?.user && !isEmailConfirmed) {
+        if (!isEmailConfirmed) {
           console.log('[Dashboard] [verifyUser] ⏳ Usuário com e-mail pendente de confirmação. Ignorando checagem de exclusão.');
           return;
         }
@@ -148,7 +160,6 @@ export function Dashboard() {
     };
     verifyUser();
   }, [currentUser?.id]); // executa quando currentUser ficar disponivel
-
   // Escuta evento para abrir modal de login (apos redefinicao de senha)
   useEffect(() => {
     const handler = () => {
