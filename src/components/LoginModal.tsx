@@ -161,10 +161,20 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     if (result.success) {
       setRegisterSuccess(true);
       setRegisterMessage(result.message || 'Cadastro realizado! Verifique seu e-mail para confirmar a conta.');
+      
+      // Limpa os campos do formulário
       setRegisterName('');
       setRegisterEmail('');
       setRegisterPassword('');
       setConfirmPassword('');
+
+      // ✅ Destrava a tela: Fecha o modal automaticamente após 5 segundos 
+      // para dar tempo do usuário ler a mensagem de sucesso com calma.
+      setTimeout(() => {
+        setIsLoginOpen(false); // Fecha o modal
+        setRegisterSuccess(false); // Reseta o estado de sucesso para a próxima vez
+      }, 5000);
+
     } else {
       setError(result.message);
     }
