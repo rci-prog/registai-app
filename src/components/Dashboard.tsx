@@ -133,24 +133,29 @@ useEffect(() => {
         console.log('[Dashboard] [verifyUser] Resultado:', currentUser.email, 'is_blocked:', profileData?.is_blocked, 'existe:', !!profileData);
         
       // --- TRAVA DE REATIVAÇÃO COMPLEMENTAR (URL + SESSIONSTORAGE) ---
-        const veioDaReativacao = sessionStorage.getItem('registai_conta_deletada_reciente') === 'true';
+        const urlParams = new URLSearchParams(window.location.search);
+        const temParametroUrl = urlParams.get('reactive') === 'true';
+        const jaBarrouNestaSessao = sessionStorage.getItem('bloqueio_reativacao_executado') === 'true';
 
-        if (veioDaReativacao) {
-          console.log('[Dashboard] [verifyUser] 🚨 Reativação recente detectada! Cortando o loop.');
+        if (temParametroUrl && !jaBarrouNestaSessao) {
+          console.log('[Dashboard] [verifyUser] 🚨 Reativação detectada via URL! Aplicando logout de segurança.');
           
-          // Removemos da sessão IMEDIATAMENTE antes de qualquer outra ação
-          sessionStorage.removeItem('registai_conta_deletada_reciente');
+          // Marca que já barrou uma vez para não entrar em loop no próximo re-render
+          sessionStorage.setItem('bloqueio_reativacao_executado', 'true');
           
-          // Limpa completamente qualquer query param que tenha vindo na URL real
-          if (window.location.search.includes('reactive=true')) {
-            const novaUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-            window.history.replaceState({ path: novaUrl }, '', novaUrl);
-          }
+          // Limpa a sujeira da URL do navegador
+          const novaUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+          window.history.replaceState({ path: novaUrl }, '', novaUrl);
           
           await logout();
           setLoginError('Conta reativada com sucesso! Por favor, faça login novamente para aceitar os termos de uso.');
           setIsLoginOpen(true);
           return;
+        }
+
+        // Se o usuário clicar no botão do Google de novo (URL já limpa), limpa a flag para futuros cadastros
+        if (!temParametroUrl && jaBarrouNestaSessao) {
+          sessionStorage.removeItem('bloqueio_reativacao_executado');
         }
         // -----------------------------------------------------------------
 
