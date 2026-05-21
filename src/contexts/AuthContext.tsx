@@ -686,7 +686,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           console.log('[Auth] [SIGNED_IN] Profile OK, salvando:', session.user!.email);
           const email = session.user!.email || '';
-n          const user: User = {
+           const user: User = {
             id: session.user!.id,
             email,
             name: session.user!.user_metadata?.full_name || email.split('@')[0] || '',
