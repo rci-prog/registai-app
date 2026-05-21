@@ -132,24 +132,25 @@ useEffect(() => {
         const profileData = data?.[0];
         console.log('[Dashboard] [verifyUser] Resultado:', currentUser.email, 'is_blocked:', profileData?.is_blocked, 'existe:', !!profileData);
         
-      // --- TRAVA DE REATIVAÇÃO BLINDADA (LIMPEZA AGRESSIVA) ---
-const getCookie = (name) => {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
-};
-
-const reativacaoPendente = getCookie('reativacao_pendente') === 'true';
+      // --- TRAVA DE REATIVAÇÃO BLINDADA (ESTADO DE BLOQUEIO) ---
+const reativacaoPendente = sessionStorage.getItem('bloqueio_reativacao_ativo') === 'true';
 
 if (reativacaoPendente) {
-  console.log('[Dashboard] [verifyUser] 🚨 Reativação detectada! Limpando cookies e deslogando.');
+  console.log('[Dashboard] [verifyUser] 🛑 Bloqueio de reativação ativo. Encerrando sessão.');
+  await logout();
+  setLoginError('Conta reativada! Faça login novamente para aceitar os termos.');
+  setIsLoginOpen(true);
+  return;
+}
 
-  // MÉTODOS DE LIMPEZA EM TODAS AS VARIAÇÕES POSSÍVEIS
-  const domain = window.location.hostname;
-  // Tenta apagar com e sem o domínio, com e sem path
-  document.cookie = "reativacao_pendente=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-  document.cookie = "reativacao_pendente=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + domain;
-  document.cookie = "reativacao_pendente=; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+// Verifica se o usuário acabou de entrar via OAuth (identificamos pelo tempo de criação ou metadados se precisar, mas vamos pelo parâmetro inicial)
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('reactive') === 'true') {
+  console.log('[Dashboard] [verifyUser] 🚨 Nova reativação detectada. Iniciando bloqueio.');
+  sessionStorage.setItem('bloqueio_reativacao_ativo', 'true');
+  
+  // Limpa a URL
+  window.history.replaceState({}, document.title, window.location.pathname);
   
   await logout();
   setLoginError('Conta reativada! Por favor, faça login novamente para aceitar os termos.');
