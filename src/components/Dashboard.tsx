@@ -132,26 +132,27 @@ useEffect(() => {
         const profileData = data?.[0];
         console.log('[Dashboard] [verifyUser] Resultado:', currentUser.email, 'is_blocked:', profileData?.is_blocked, 'existe:', !!profileData);
         
-      // --- TRAVA DE REATIVAÇÃO COMPLEMENTAR (URL + SESSIONSTORAGE) ---
-        const getCookie = (name: string) => {
-          const value = `; ${document.cookie}`;
-          const parts = value.split(`; ${name}=`);
-          if (parts.length === 2) return parts.pop()?.split(';').shift();
-        };
+      // --- TRAVA DE REATIVAÇÃO BLINDADA (VIA COOKIE) ---
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+};
 
-        const reativacaoPendente = getCookie('reativacao_pendente') === 'true';
+const reativacaoPendente = getCookie('reativacao_pendente') === 'true';
 
-        if (reativacaoPendente) {
-          console.log('[Dashboard] [verifyUser] 🚨 Reativação detectada via COOKIE! Aplicando logout.');
-          
-          // Expira o cookie imediatamente
-          document.cookie = "reativacao_pendente=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-          
-          await logout();
-          setLoginError('Conta reativada! Faça login novamente para aceitar os termos.');
-          setIsLoginOpen(true);
-          return;
-        }
+if (reativacaoPendente) {
+  console.log('[Dashboard] [verifyUser] 🚨 Reativação detectada via COOKIE! Aplicando logout.');
+  
+  // Remove o cookie forçadamente para todos os caminhos
+  document.cookie = "reativacao_pendente=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+  document.cookie = "reativacao_pendente=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/dashboard;"; // caso o path seja diferente
+  
+  await logout();
+  setLoginError('Conta reativada! Faça login novamente para aceitar os termos.');
+  setIsLoginOpen(true);
+  return;
+}
         // -----------------------------------------------------------------
 
         if (!profileData) {
