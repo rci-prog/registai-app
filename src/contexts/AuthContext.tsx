@@ -291,14 +291,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (signUpData?.user) {
-        // 🚀 REMOVEMOS: setCurrentUser, saveAuth e setProfile daqui!
-        // Assim o front-end não finge que o usuário já está logado antes de confirmar o e-mail.
+        // Checa se o usuário já veio com o e-mail confirmado (isso acontece no OAuth/Google)
+        const isEmailConfirmed = !!signUpData.user.email_confirmed_at;
+        const isAdminUser = email === ADMIN_EMAIL;
 
-        console.log('[Auth] [register] ✅ Cadastro pré-registrado. Aguardando confirmação de e-mail.');
-        return { 
-          success: true, 
-          message: 'Conta criada! Enviamos um link de confirmação para o seu e-mail. Por favor, verifique sua caixa de entrada ou spam antes de fazer o primeiro login.' 
-        };
+        if (isEmailConfirmed) {
+          // 🟢 FLUXO GOOGLE / CONTA JÁ ATIVA:
+          // Salva os estados locais imediatamente para liberar o login e a tela de termos
+          const user: User = {
+            id: signUpData.user.id,
+            email,
+            name,
+            avatar: '',
+            role: isAdminUser ? 'admin' : 'user',
+            createdAt: new Date(signUpData.user.created_at || Date.now()),
+          };
+
+          setCurrentUser(user);
+          saveAuth(user);
+          setProfile({
+            id: signUpData.user.id, email, name, avatar: '',
+            role: isAdminUser ? 'admin' : 'user', theme: 'dark',
+          });
+
+          console.log('[Auth] [register] ✅ Login via Provedor Ativo (Google) concluído localmente.');
+          return { success: true, isOAuth: true };
+        } else {
+          // ✉️ FLUXO E-MAIL/SENHA TRADICIONAL:
+          // NÃO seta os estados locais. Força o usuário a ir ao e-mail confirmar.
+          console.log('[Auth] [register] ⏳ Cadastro com e-mail pendente. Aguardando confirmação.');
+          return { 
+            success: true, 
+            isOAuth: false,
+            message: 'Conta criada! Enviamos um link de confirmação para o seu e-mail. Por favor, verifique sua caixa de entrada ou spam antes de fazer o primeiro login.' 
+          };
+        }
       }
 
       return { success: false, message: 'Erro ao processar cadastro. Tente novamente.' };
