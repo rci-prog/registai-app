@@ -95,7 +95,7 @@ export function Dashboard() {
   const SUPABASE_URL = 'https://cmfgirvgnexkcomhcosm.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_Dm-ozWvAve1nkgjEDg_QsA_-gldlMxk';
   const { logout } = useAuth();
-  useEffect(() => {
+useEffect(() => {
     const verifyUser = async () => {
       if (!currentUser?.id) return;
       console.log('[Dashboard] [verifyUser] Verificando usuario:', currentUser.email);
@@ -123,8 +123,8 @@ export function Dashboard() {
           return;
         }
 
-        // Fetch direto = bypass RLS, le o valor REAL do is_blocked
-        const resp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,is_blocked&id=eq.${currentUser.id}`, {
+        // MUDANÇA 1: Adicionado 'created_at' no select para tracking de reativação via Google
+        const resp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,is_blocked,created_at&id=eq.${currentUser.id}`, {
           method: 'GET',
           headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
         });
@@ -143,6 +143,43 @@ export function Dashboard() {
           setIsLoginOpen(true);
           return;
         }
+
+        // MUDANÇA 2: Trava inteligente apenas para contas Google recém-criadas/recriadas
+        const createdAt = new Date(profileData.created_at).getTime();
+        const agora = new Date().getTime();
+        const diferencaSegundos = (agora - createdAt) / 1000;
+        
+        // Detecta se o provedor atual é o Google
+        const provider = currentUser?.app_metadata?.provider || currentUser?.identities?.[0]?.provider;
+
+        if (provider === 'google' && diferencaSegundos < 10) {
+          console.log('[Dashboard] [verifyUser] 🆕 Conta Google recém-criada/recriada detectada. Forçando termos.');
+          
+          // ---- SEU MODAL DE TERMOS ENTRA AQUI ----
+          // Exemplo de comportamento se você quiser deslogar e avisar:
+          await logout();
+          setLoginError('Conta reativada! Por favor, faça login novamente e aceite os termos de uso.');
+          setIsLoginOpen(true);
+          return;
+          // ----------------------------------------
+        }
+        
+        const rawBlocked = profileData?.is_blocked;
+        const isBlocked = rawBlocked === true || rawBlocked === 'true' || rawBlocked === 1 || rawBlocked === 't';
+        if (isBlocked) {
+          console.log('[Dashboard] [verifyUser] 🚫 Usuario BLOQUEADO detectado, fazendo signOut:', currentUser.email);
+          await logout();
+          setLoginError('Sua conta foi suspensa. Entre em contato com o suporte.');
+          setIsLoginOpen(true);
+          return;
+        }
+        console.log('[Dashboard] [verifyUser] ✅ Usuario OK:', currentUser.email);
+      } catch (e: any) {
+        console.error('[Dashboard] [verifyUser] Erro:', e.message);
+      }
+    };
+    verifyUser();
+  }, [currentUser?.id]);
         
         const rawBlocked = profileData?.is_blocked;
         const isBlocked = rawBlocked === true || rawBlocked === 'true' || rawBlocked === 1 || rawBlocked === 't';
