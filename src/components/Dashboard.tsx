@@ -1027,8 +1027,8 @@ useEffect(() => {
         theme={theme}
         onUpdate={updateProfile}
         onDeleteAccount={async () => {
-          console.log('[Dashboard] Marcando conta como deletada recentemente no localStorage');
-          localStorage.setItem('registai_conta_deletada_reciente', 'true');
+          console.log('[Dashboard] Marcando conta como deletada recentemente no sessionStorage');
+          sessionStorage.setItem('registai_conta_deletada_reciente', 'true');
           await deleteAccount();
         }}
       />
