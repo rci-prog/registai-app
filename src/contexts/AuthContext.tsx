@@ -383,12 +383,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loginWithGoogle = useCallback(async () => {
-  // Define cookie de sessão
-  document.cookie = "reativacao_pendente=true; path=/";
-
+  // Limpa qualquer bloqueio anterior antes de tentar logar
+  sessionStorage.removeItem('bloqueio_reativacao_ativo');
+  
   const { data, error } = await supabase.auth.signInWithOAuth({ 
     provider: 'google', 
-    options: { redirectTo: window.location.origin } 
+    options: { redirectTo: `${window.location.origin}?reactive=true` } 
   });
   
   if (error) return { success: false, message: error.message };
