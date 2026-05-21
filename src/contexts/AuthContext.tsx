@@ -262,7 +262,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchProfile, checkUserBlocked]);
 
-    // REGISTER — cadastro limpo e padrão (trigger SQL cuida da limpeza de contas deletadas)
+    // REGISTER — Versão definitiva e ultra-limpa (O Trigger SQL cuida de criar o profile no banco)
   const register = useCallback(async (email: string, password: string, name: string): Promise<{ success: boolean; message: string }> => {
     try {
       console.log('[Auth] [register] Iniciando cadastro:', email);
@@ -271,7 +271,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         options: {
-          data: { full_name: name },
+          data: { full_name: name }, // Passa o nome nos metadados para o Trigger do banco ler
           emailRedirectTo: 'https://www.registai.com.br',
         },
       });
@@ -290,26 +290,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, message: signUpError.message };
       }
 
-      // Sucesso: criar profile
       if (signUpData?.user) {
         const isAdminUser = email === ADMIN_EMAIL;
-        const newProfile = {
-          id: signUpData.user.id,
-          email,
-          full_name: name,
-          avatar_url: '',
-          role: isAdminUser ? 'admin' : 'user',
-          theme: 'dark',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        const { error: profileError } = await supabase.from('profiles').insert(newProfile);
-        if (profileError) {
-          console.warn('[Auth] [register] Erro ao criar profile:', profileError.message);
-        } else {
-          console.log('[Auth] [register] ✅ Profile criado');
-        }
-
+        
+        // Monta o estado local do usuário baseado no que acabou de ser criado no banco
         const user: User = {
           id: signUpData.user.id,
           email,
@@ -318,13 +302,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: isAdminUser ? 'admin' : 'user',
           createdAt: new Date(signUpData.user.created_at || Date.now()),
         };
+
         setCurrentUser(user);
         saveAuth(user);
         setProfile({
           id: signUpData.user.id, email, name, avatar: '',
           role: isAdminUser ? 'admin' : 'user', theme: 'dark',
         });
-        console.log('[Auth] [register] ✅ Cadastro concluído');
+
+        console.log('[Auth] [register] ✅ Cadastro concluído localmente');
         return { success: true, message: 'Conta criada! Verifique seu e-mail para confirmar a conta antes de fazer login.' };
       }
 
