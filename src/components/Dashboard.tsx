@@ -132,30 +132,27 @@ useEffect(() => {
         const profileData = data?.[0];
         console.log('[Dashboard] [verifyUser] Resultado:', currentUser.email, 'is_blocked:', profileData?.is_blocked, 'existe:', !!profileData);
         
-      // --- TRAVA DE REATIVAÇÃO BLINDADA (ESTADO DE BLOQUEIO) ---
-const reativacaoPendente = sessionStorage.getItem('bloqueio_reativacao_ativo') === 'true';
+      // --- TRAVA DE REATIVAÇÃO ---
+const isBlockedRef = useRef(false); // Adicione este useRef no topo do componente
 
-if (reativacaoPendente) {
-  console.log('[Dashboard] [verifyUser] 🛑 Bloqueio de reativação ativo. Encerrando sessão.');
-  await logout();
+// Dentro do seu useEffect de verificação:
+const urlParams = new URLSearchParams(window.location.search);
+const isReactive = urlParams.get('reactive') === 'true';
+const isBlocked = sessionStorage.getItem('bloqueio_reativacao_ativo') === 'true';
+
+if ((isReactive || isBlocked) && !isBlockedRef.current) {
+  isBlockedRef.current = true;
+  
+  if (isReactive) {
+    sessionStorage.setItem('bloqueio_reativacao_ativo', 'true');
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+  
+  console.log('[Dashboard] 🛑 Bloqueio ativo. Executando logout...');
+  await logout(); // Garanta que essa função chame o signOut e remova tokens
   setLoginError('Conta reativada! Faça login novamente para aceitar os termos.');
   setIsLoginOpen(true);
-  return;
-}
-
-// Verifica se o usuário acabou de entrar via OAuth (identificamos pelo tempo de criação ou metadados se precisar, mas vamos pelo parâmetro inicial)
-const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.get('reactive') === 'true') {
-  console.log('[Dashboard] [verifyUser] 🚨 Nova reativação detectada. Iniciando bloqueio.');
-  sessionStorage.setItem('bloqueio_reativacao_ativo', 'true');
-  
-  // Limpa a URL
-  window.history.replaceState({}, document.title, window.location.pathname);
-  
-  await logout();
-  setLoginError('Conta reativada! Por favor, faça login novamente para aceitar os termos.');
-  setIsLoginOpen(true);
-  return;
+  return; // Interrompe o fluxo de renderização
 }
         // -----------------------------------------------------------------
 
