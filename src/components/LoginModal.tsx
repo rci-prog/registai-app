@@ -141,13 +141,12 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     // Se sucesso, o navegador sera redirecionado pelo Supabase
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
+    const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Validar senhas
     if (registerPassword !== confirmPassword) {
-      setError('As senhas nao coincidem.');
+      setError('As senhas não coincidem.');
       return;
     }
 
@@ -157,32 +156,16 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     }
 
     setIsLoading(true);
-
     const result = await register(registerEmail, registerPassword, registerName);
     
     if (result.success) {
-      // Se a mensagem indica reativacao (login automatico), fechar modal direto
-      if (result.message.includes('reativada') || result.message.includes('Bem-vindo de volta')) {
-        setRegisterName('');
-        setRegisterEmail('');
-        setRegisterPassword('');
-        setConfirmPassword('');
-        onClose();
-      } else {
-        // Cadastro novo com confirmacao por e-mail
-        setRegisterSuccess(true);
-        setRegisterMessage(result.message || 'Cadastro realizado! Verifique seu e-mail para confirmar a conta.');
-        setRegisterName('');
-        setRegisterEmail('');
-        setRegisterPassword('');
-        setConfirmPassword('');
-      }
-    } else if (result.isDeletedAccountWithNewPassword) {
-      // Conta deletada + senha nova → mostrar prompt de reativacao com OTP
-      console.log('[LoginModal] Conta deletada + senha nova — mostrando prompt de reativacao');
-      setShowReactivationPrompt(true);
+      setRegisterSuccess(true);
+      setRegisterMessage(result.message || 'Cadastro realizado! Verifique seu e-mail para confirmar a conta.');
+      setRegisterName('');
+      setRegisterEmail('');
+      setRegisterPassword('');
+      setConfirmPassword('');
     } else {
-      // Erro generico
       setError(result.message);
     }
     setIsLoading(false);
