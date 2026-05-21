@@ -383,19 +383,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loginWithGoogle = useCallback(async () => {
-    // Garantimos o cookie aqui também por segurança
-    document.cookie = "reativacao_pendente=true; max-age=3600; path=/";
+  // Define cookie de sessão
+  document.cookie = "reativacao_pendente=true; path=/";
 
-    const { data, error } = await supabase.auth.signInWithOAuth({ 
-      provider: 'google', 
-      options: { 
-        redirectTo: `${window.location.origin}` // O cookie fará o trabalho, não precisamos mais da URL
-      } 
-    });
-    
-    if (error) return { success: false, message: error.message };
-    if (data.url) window.location.href = data.url;
-  }, []);
+  const { data, error } = await supabase.auth.signInWithOAuth({ 
+    provider: 'google', 
+    options: { redirectTo: window.location.origin } 
+  });
+  
+  if (error) return { success: false, message: error.message };
+  if (data.url) window.location.href = data.url;
+}, []);
 
   const resetPassword = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/?reset_password=true` });
