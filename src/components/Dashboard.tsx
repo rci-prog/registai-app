@@ -132,28 +132,23 @@ useEffect(() => {
         const profileData = data?.[0];
         console.log('[Dashboard] [verifyUser] Resultado:', currentUser.email, 'is_blocked:', profileData?.is_blocked, 'existe:', !!profileData);
         
-        // --- TRAVA COMPLEMENTAR DE REATIVAÇÃO INTEGRADA ---
-        const provider = currentUser?.app_metadata?.provider || currentUser?.identities?.[0]?.provider;
-        
-        // Pegamos a data de criação da identidade atual do usuário logado
-        const identityCreatedAt = currentUser?.identities?.[0]?.created_at 
-          ? new Date(currentUser.identities[0].created_at).getTime() 
-          : new Date(currentUser?.created_at || 0).getTime();
+      // --- TRAVA DE REATIVAÇÃO COMPLEMENTAR (URL + SESSIONSTORAGE) ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const veioDaReativacao = urlParams.get('reactive') === 'true' || sessionStorage.getItem('registai_conta_deletada_reciente') === 'true';
+
+        if (veioDaReativacao) {
+          console.log('[Dashboard] [verifyUser] 🚨 Reativação recente detectada!');
           
-        const agoraLocal = new Date().getTime();
-        const diferencaJanelaSegundos = Math.abs(agoraLocal - identityCreatedAt) / 1000;
-
-        console.log('[Dashboard] [verifyUser] Provedor:', provider, '| Diferença em seg:', diferencaJanelaSegundos);
-
-        // Se a identidade foi gerada nos últimos 15 segundos, intercepta o login direto
-        if (provider === 'google' && diferencaJanelaSegundos < 15) {
-          console.log('[Dashboard] [verifyUser] 🚨 Conta Google criada ou reativada recentemente detectada!');
+          // Limpa os rastros para o próximo login funcionar normalmente
+          sessionStorage.removeItem('registai_conta_deletada_reciente');
+          window.history.replaceState({}, document.title, window.location.pathname);
+          
           await logout();
           setLoginError('Conta reativada com sucesso! Por favor, faça login novamente para aceitar os termos de uso.');
           setIsLoginOpen(true);
           return;
         }
-        // --------------------------------------------------
+        // -----------------------------------------------------------------
 
         if (!profileData) {
           console.log('[Dashboard] [verifyUser] Usuario deletado detectado, fazendo signOut');
