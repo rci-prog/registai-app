@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Lock, Mail, CheckCircle, Eye, EyeOff, ArrowLeft, KeyRound, HelpCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { SupportModal } from '@/components/SupportModal';
 
 interface LoginModalProps {
@@ -29,14 +30,19 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
   const [error, setError] = useState(initialError || '');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Atualizar erro quando initialError muda (ex: após redirect do Google com conta bloqueada)
+  // Estado para prompt de reativacao de conta deletada com senha nova
+  const [showReactivationPrompt, setShowReactivationPrompt] = useState(false);
+  const [reactivationLoading, setReactivationLoading] = useState(false);
+  const [reactivationSent, setReactivationSent] = useState(false);
+
+  // Atualizar erro quando initialError muda (ex: apos redirect do Google com conta bloqueada)
   useEffect(() => {
     if (initialError) {
       setError(initialError);
     }
   }, [initialError]);
 
-  // Escutar evento para abrir modal de nova senha (quando usuário clica no link do e-mail)
+  // Escutar evento para abrir modal de nova senha (quando usuario clica no link do e-mail)
   useEffect(() => {
     const handler = () => {
       console.log('[LoginModal] Evento open-reset-password-modal recebido');
@@ -89,8 +95,8 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     e.preventDefault();
     setError('');
     if (!newPassword.trim()) { setError('Digite a nova senha.'); return; }
-    if (newPassword.length < 6) { setError('A senha deve ter no mínimo 6 caracteres.'); return; }
-    if (newPassword !== confirmNewPassword) { setError('As senhas não coincidem.'); return; }
+    if (newPassword.length < 6) { setError('A senha deve ter no minimo 6 caracteres.'); return; }
+    if (newPassword !== confirmNewPassword) { setError('As senhas nao coincidem.'); return; }
     setIsLoading(true);
     try {
       const result = await updatePassword('', newPassword);
@@ -171,30 +177,40 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
         setRegisterPassword('');
         setConfirmPassword('');
       }
+    } else if (result.isDeletedAccountWithNewPassword) {
+      // Conta deletada + senha nova → mostrar prompt de reativacao com OTP
+      console.log('[LoginModal] Conta deletada + senha nova — mostrando prompt de reativacao');
+      setShowReactivationPrompt(true);
     } else {
-      // Cadastro falhou — verificar se é conta deletada e tentar login automatico
-      const isAccountDeletedError = 
-        result.message.includes('reativar') || 
-        result.message.includes('encerrada');
-      
-      if (isAccountDeletedError) {
-        console.log('[LoginModal] Tentando login automatico apos cadastro falho...');
-        const loginResult = await login(registerEmail, registerPassword);
-        if (loginResult.success) {
-          console.log('[LoginModal] Login automatico OK — fechando modal');
-          setRegisterName('');
-          setRegisterEmail('');
-          setRegisterPassword('');
-          setConfirmPassword('');
-          onClose();
-        } else {
-          setError('Este e-mail ja esta em uso por outra conta. Se esta conta for sua, faca login ou recupere sua senha.');
-        }
-      } else {
-        setError(result.message);
-      }
+      // Erro generico
+      setError(result.message);
     }
     setIsLoading(false);
+  };
+
+  const handleReactivateWithOTP = async () => {
+    setError('');
+    setReactivationLoading(true);
+    try {
+      console.log('[LoginModal] Enviando OTP magico para:', registerEmail);
+      const { error } = await supabase.auth.signInWithOtp({
+        email: registerEmail,
+        options: {
+          emailRedirectTo: `${window.location.origin}/?magic_link=true`,
+        },
+      });
+      if (error) {
+        console.error('[LoginModal] Erro no OTP:', error.message);
+        setError(error.message);
+      } else {
+        console.log('[LoginModal] OTP magico enviado com sucesso');
+        setReactivationSent(true);
+      }
+    } catch (err: any) {
+      console.error('[LoginModal] Erro ao enviar OTP:', err.message);
+      setError(err.message || 'Erro ao enviar link de reativacao.');
+    }
+    setReactivationLoading(false);
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -230,6 +246,8 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     setShowForgotPassword(false);
     setResetEmail('');
     setResetSent(false);
+    setShowReactivationPrompt(false);
+    setReactivationSent(false);
   };
 
   return (
@@ -279,6 +297,68 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
             >
               Ir para Login
             </Button>
+          </div>
+        ) : showReactivationPrompt ? (
+          <div className="text-center space-y-5 py-2">
+            {reactivationSent ? (
+              <>
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto bg-emerald-500/20">
+                  <CheckCircle className="w-8 h-8 text-emerald-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">
+                  Link de Reativacao Enviado!
+                </h3>
+                <p className="text-sm text-slate-400">
+                  Verifique seu e-mail ({registerEmail}) e clique no link para entrar direto na sua conta reativada.
+                </p>
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 mx-auto max-w-sm">
+                  <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-400 text-left">
+                    Caso nao encontre o e-mail na sua Caixa de Entrada em instantes, por favor verifique sua pasta de Spam ou Lixo Eletronico.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => { setShowReactivationPrompt(false); setReactivationSent(false); setActiveTab('login'); }}
+                  className="bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Voltar ao login
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto bg-violet-500/20">
+                  <KeyRound className="w-8 h-8 text-violet-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">
+                  Reativar Conta
+                </h3>
+                <p className="text-sm text-slate-400 max-w-sm mx-auto">
+                  Notamos que voce ja teve uma conta conosco que foi encerrada. Para reativa-la agora mesmo com a senha que voce escolheu, clique no botao abaixo. Enviaremos um link magico para <strong className="text-white">{registerEmail}</strong>.
+                </p>
+                {error && (
+                  <div className="rounded-lg p-3 text-sm text-center border bg-red-500/10 border-red-500/30 text-red-400 max-w-sm mx-auto">
+                    {error}
+                  </div>
+                )}
+                <Button
+                  onClick={handleReactivateWithOTP}
+                  disabled={reactivationLoading}
+                  className="w-full max-w-sm mx-auto bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white py-3 rounded-xl font-semibold text-base"
+                >
+                  {reactivationLoading ? 'Enviando...' : 'Enviar Link Magico de Reativacao'}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => { setShowReactivationPrompt(false); setError(''); setReactivationSent(false); }}
+                  className="text-sm text-slate-400 hover:text-white transition-colors"
+                >
+                  <ArrowLeft className="w-3 h-3 inline mr-1" />
+                  Voltar ao cadastro
+                </button>
+              </>
+            )}
           </div>
         ) : showNewPassword ? (
           !passwordUpdated ? (
@@ -343,7 +423,7 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
                 Senha atualizada com sucesso!
               </h3>
               <p className="text-sm text-slate-400">
-                Sua senha foi redefinida. Agora você pode fazer login com a nova senha.
+                Sua senha foi redefinida. Agora voce pode fazer login com a nova senha.
               </p>
               <Button
                 onClick={() => { setShowNewPassword(false); setPasswordUpdated(false); }}
@@ -654,14 +734,13 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
                         Contatar administrador
                       </button>
                     )}
-                    {error.includes('conta anterior') && (
+                    {error.includes('removida') && (
                       <button
-                        type="button"
                         className="inline-flex items-center gap-1 mt-2 text-violet-400 hover:text-violet-300 transition-colors text-xs font-medium"
-                        onClick={() => { setShowForgotPassword(true); setError(''); setResetEmail(registerEmail); }}
+                        onClick={() => setSupportOpen(true)}
                       >
-                        <KeyRound className="w-3 h-3" />
-                        Esqueci a senha
+                        <HelpCircle className="w-3 h-3" />
+                        Contatar administrador
                       </button>
                     )}
                   </div>
