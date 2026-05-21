@@ -23,6 +23,8 @@ interface AuthContextType {
   isAuthReady: boolean;
   users: Profile[];
   blockMessage: string | null;
+  needsOnboarding: boolean;
+  dismissOnboarding: () => void;
   login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
@@ -48,6 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [blockMessage, setBlockMessage] = useState<string | null>(null);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   const setCurrentUserRef = useRef(setCurrentUser);
   const setProfileRef = useRef(setProfile);
@@ -74,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ============================================================
-  // AUTO-PROVISIONAMENTO DE PROFILE (para Google OAuth)
+  // AUTO-PROVISIONAMENTO DE PROFILE (UPSERT para Google OAuth)
   // ============================================================
   const autoProvisionProfile = useCallback(async (sessionUser: any): Promise<boolean> => {
     try {
@@ -83,26 +86,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const name = sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name || email.split('@')[0];
       const avatar = sessionUser.user_metadata?.avatar_url || sessionUser.user_metadata?.picture || '';
 
-      const newProfile = {
+      const profilePayload = {
         id: sessionUser.id,
         email,
         full_name: name,
         avatar_url: avatar,
         role: isAdminUser ? 'admin' : 'user',
         theme: 'dark',
-        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
-      console.log('[Auth] [autoProvision] Criando profile para Google OAuth:', email);
-      const { error: insertError } = await supabase.from('profiles').insert(newProfile);
+      console.log('[Auth] [autoProvision] Upsert profile para Google OAuth:', email);
+      // UPSERT: insere se nao existe, atualiza se existe (evita erro 409)
+      const { error } = await supabase
+        .from('profiles')
+        .upsert(profilePayload, { onConflict: 'id', ignoreDuplicates: false });
 
-      if (insertError) {
-        console.error('[Auth] [autoProvision] Erro ao criar profile:', insertError.message);
+      if (error) {
+        console.error('[Auth] [autoProvision] Erro no upsert:', error.message);
         return false;
       }
 
-      console.log('[Auth] [autoProvision] ✅ Profile criado para:', email);
+      console.log('[Auth] [autoProvision] ✅ Profile upserted para:', email);
 
       const user: User = {
         id: sessionUser.id,
@@ -137,7 +142,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = useCallback(async (userId: string): Promise<boolean> => {
     try {
-      // Busca profile via Supabase client (com RLS — OK para leitura normal)
       const { data: profileData, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
       console.log('[Auth] [fetchProfile] userId:', userId, 'found:', !!profileData, 'error:', error?.message);
       if (error || !profileData) {
@@ -170,7 +174,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      // === VERIFICACAO DE BLOQUEIO via fetch direto (bypass RLS) ===
       try {
         const resp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=is_blocked&id=eq.${userId}`, {
           method: 'GET',
@@ -180,7 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const blockData = await resp.json();
           const rawBlocked = blockData?.[0]?.is_blocked;
           const isBlocked = rawBlocked === true || rawBlocked === 'true' || rawBlocked === 1 || rawBlocked === 't';
-          console.log('[Auth] [fetchProfile] Bloqueio check (fetch direto):', profileData.email, 'raw:', rawBlocked, 'bloqueado:', isBlocked);
+          console.log('[Auth] [fetchProfile] Bloqueio check:', profileData.email, 'raw:', rawBlocked, 'bloqueado:', isBlocked);
           if (isBlocked) {
             console.log('[Auth] [fetchProfile] 🚫 Usuario BLOQUEADO:', profileData.email);
             await supabase.auth.signOut();
@@ -207,11 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfileRef.current(mappedProfile);
       const cachedUser = getAuth();
       if (cachedUser?.id === userId) {
-        const updatedUser = {
-          ...cachedUser,
-          name: mappedProfile.name || cachedUser.name,
-          avatar: mappedProfile.avatar || cachedUser.avatar,
-        };
+        const updatedUser = { ...cachedUser, name: mappedProfile.name || cachedUser.name, avatar: mappedProfile.avatar || cachedUser.avatar };
         if (updatedUser.avatar !== cachedUser.avatar || updatedUser.name !== cachedUser.name) {
           setCurrentUserRef.current(updatedUser);
           saveAuth(updatedUser);
@@ -269,7 +268,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('[Auth] [register] ===== INICIO =====', email);
 
-      // 1. Deletar profile antigo se existir
       const { data: oldProfile } = await supabase.from('profiles').select('id,email').eq('email', email).maybeSingle();
       console.log('[Auth] [register] 1. Profile antigo:', oldProfile);
       if (oldProfile) {
@@ -277,7 +275,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[Auth] [register] 2. Profile antigo deletado');
       }
 
-      // 2. signUp com confirmacao por e-mail habilitada
       console.log('[Auth] [register] 3. Chamando signUp...');
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -288,8 +285,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      // Sempre fazer signOut apos signUp para garantir que o usuario
-      // so acesse apos confirmar o e-mail (evita auto-login indesejado)
       await supabase.auth.signOut();
       clearAuth();
 
@@ -311,24 +306,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, message: 'Erro ao criar conta.' };
       }
 
-      // 3. Sem session = email ja existe no Auth
       if (!data.session) {
-        // Verificar se o profile existe (conta ativa vs. deletada)
         const { data: profileCheck } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
         console.log('[Auth] [register] 5. Profile check:', profileCheck ? 'ATIVO' : 'DELETADO');
 
         if (!profileCheck) {
-          // CONTA DELETADA: auth user existe mas profile foi removido
           console.log('[Auth] [register] 5b. Conta deletada detectada. Tentando reativacao...');
           const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
           if (loginError || !loginData.user) {
-            console.log('[Auth] [register] 6. Reativacao falhou (senha incorreta):', loginError?.message);
+            console.log('[Auth] [register] 6. Reativacao falhou:', loginError?.message);
             return {
               success: false,
               message: 'Esta conta foi removida anteriormente. Para recuperar o acesso com este e-mail, use a opcao "Esqueci a senha" na tela de login. Para criar uma conta nova, utilize um e-mail diferente.',
             };
           }
-          // Login OK — recriar profile automaticamente (reativacao da conta)
           console.log('[Auth] [register] 7. Reativacao OK. Recriando profile...');
           const isAdminUser = email === ADMIN_EMAIL;
           const recreatedProfile = {
@@ -356,14 +347,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { success: true, message: 'Conta reativada com sucesso! Bem-vindo de volta.' };
         }
 
-        // CONTA ATIVA: tentar login com a senha fornecida
         console.log('[Auth] [register] 5c. Conta ativa. Tentando login...');
         const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
         if (loginError || !loginData.user) {
           console.log('[Auth] [register] 6. Login falhou:', loginError?.message);
           return { success: false, message: 'Este e-mail ja esta cadastrado. Use a opcao "Esqueci a senha" na tela de login ou entre com sua senha correta.' };
         }
-        // Login funcionou — entra com a conta existente
         console.log('[Auth] [register] 7. Login OK com credenciais existentes');
         const user: User = {
           id: loginData.user.id,
@@ -379,7 +368,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: true, message: 'Login realizado com sucesso!' };
       }
 
-      // 4. Novo usuario → criar profile
       console.log('[Auth] [register] 5. Novo usuario. ID:', data.user.id);
       const isAdminUser = email === ADMIN_EMAIL;
       const newProfile = {
@@ -415,13 +403,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // DELETE ACCOUNT — via Edge Function
+  // DELETE ACCOUNT
   const deleteAccount = useCallback(async (): Promise<{ success: boolean; message: string }> => {
     const userId = currentUserRef.current?.id;
     if (!userId) return { success: false, message: 'Usuario nao identificado' };
     try {
       console.log('[Auth] [deleteAccount] Deletando dados do usuario:', userId);
-      // Deletar dados relacionados (ignora erros individuais)
       const tables = ['user_tools', 'user_budgets', 'user_subscriptions', 'projects', 'tool_clicks'];
       for (const table of tables) {
         const { error } = await supabase.from(table).delete().eq('user_id', userId);
@@ -448,6 +435,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCurrentUser(null);
     setProfile(null);
     setBlockMessage(null);
+    setNeedsOnboarding(false);
   }, []);
 
   const updateProfile = useCallback(async (updates: Partial<Profile>) => {
@@ -475,6 +463,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true, message: 'Link de redefinicao enviado!' };
   }, []);
 
+  const dismissOnboarding = useCallback(() => {
+    setNeedsOnboarding(false);
+  }, []);
+
   const addUser = useCallback(async (_email: string, _role: string) => ({ success: false, message: 'Desabilitado' }), []);
   const deleteUser = useCallback(async (_id: string) => ({ success: false, message: 'Use o painel admin' }), []);
   const updateUserProfile = useCallback(async (id: string, updates: Partial<Profile>) => {
@@ -489,11 +481,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) return { success: false, message: error.message };
     return { success: true, message: 'Senha atualizada!' };
   }, []);
-  // ============================================================
-  // THEME: Dark Mode exclusivo — updateTheme desabilitado
-  // ============================================================
   const updateTheme = useCallback((_newTheme: 'light' | 'dark') => {
-    // Dark Mode e o unico tema disponivel. Troca ignorada.
     console.log('[Auth] [updateTheme] Troca de tema ignorada — Dark Mode exclusivo.');
   }, []);
   const getUserFavorites = useCallback(async (userId: string) => {
@@ -502,7 +490,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ============================================================
-  // INICIALIZACAO — Restaurar sessao (cache ou OAuth)
+  // INICIALIZACAO
   // ============================================================
   useEffect(() => {
     const init = async () => {
@@ -510,20 +498,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const { data: { session } } = await supabase.auth.getSession();
 
-      // >>> PROTECAO FLUXO DE RECUPERACAO DE SENHA <<<
-      // Se a URL indica que viemos de um link de recovery, NUNCA destruir a
-      // sessao mesmo que o profile esteja ausente (conta deletada).
       const isRecoveryFlow = new URLSearchParams(window.location.search).get('reset_password') === 'true';
       if (isRecoveryFlow && session?.user) {
-        console.log('[Auth] [init] 🔒 Fluxo de RECOVERY detectado — sessao preservada, pulando verificacoes de profile/bloqueio');
+        console.log('[Auth] [init] 🔒 RECOVERY detectado — sessao preservada');
         setIsLoading(false);
         return;
       }
 
       if (session?.user) {
-        console.log('[Auth] Sessao OAuth/Supabase encontrada:', session.user.email);
+        console.log('[Auth] Sessao encontrada:', session.user.email);
 
-        // Verifica bloqueio antes de setar usuario
         try {
           const resp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=is_blocked&id=eq.${session.user.id}`, {
             method: 'GET',
@@ -534,7 +518,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const raw = data?.[0]?.is_blocked;
             const isBlocked = raw === true || raw === 'true' || raw === 1 || raw === 't';
             if (isBlocked) {
-              console.log('[Auth] 🚫 OAuth usuario BLOQUEADO:', session.user.email);
+              console.log('[Auth] 🚫 BLOQUEADO:', session.user.email);
               await supabase.auth.signOut();
               clearAuth();
               setCurrentUser(null);
@@ -547,21 +531,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               return;
             }
           }
-        } catch (e) { /* ignora erro, deixa passar */ }
+        } catch (e) { /* ignora */ }
 
-        // Verificar se profile existe (conta nao foi deletada)
         const { data: profileCheck } = await supabase.from('profiles').select('id').eq('id', session.user.id).maybeSingle();
 
         if (!profileCheck) {
-          // >>> AUTO-PROVISIONAMENTO PARA GOOGLE OAUTH <<<
-          // Se o provedor for Google, cria o profile automaticamente em vez de
-          // destruir a sessao. Usuarios de e-mail/senha continuam precisando
-          // fazer cadastro manual.
           if (isGoogleProvider(session.user)) {
-            console.log('[Auth] Profile ausente, mas provedor Google detectado — auto-provisionando...');
+            console.log('[Auth] Profile ausente + Google — auto-provisionando (upsert)...');
             const provisioned = await autoProvisionProfile(session.user);
             if (provisioned) {
-              console.log('[Auth] ✅ Google OAuth auto-provisionado com sucesso');
+              console.log('[Auth] ✅ Google auto-provisionado');
+              setNeedsOnboarding(true);
               setBlockMessage(null);
               setIsLoading(false);
               if (window.location.hash.includes('access_token=')) {
@@ -569,10 +549,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
               return;
             }
-            console.warn('[Auth] Falha no auto-provisionamento, continuando como sem profile...');
+            console.warn('[Auth] Falha no auto-provisionamento');
           }
 
-          console.log('[Auth] Sessao encontrada mas profile nao existe (conta deletada):', session.user.email);
+          console.log('[Auth] Profile nao existe (conta deletada):', session.user.email);
           await supabase.auth.signOut();
           clearAuth();
           setCurrentUser(null);
@@ -584,7 +564,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Profile existe — seta usuario
         const email = session.user.email || '';
         const user: User = {
           id: session.user.id,
@@ -599,14 +578,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fetchProfile(session.user.id);
         setBlockMessage(null);
         setIsLoading(false);
-        // Limpa hash do OAuth apos login bem-sucedido
         if (window.location.hash.includes('access_token=')) {
           window.history.replaceState(null, '', window.location.pathname + window.location.search);
         }
         return;
       }
 
-      // 2. Sem sessao OAuth — restaurar cache
       const cachedUser = getAuth();
       if (cachedUser?.id) {
         console.log('[Auth] Cache restaurado:', cachedUser.email);
@@ -618,20 +595,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     };
 
-    // >>> DETECTAR CALLBACK DE RECUPERACAO DE SENHA <<<
     const params = new URLSearchParams(window.location.search);
     if (params.get('reset_password') === 'true') {
-      console.log('[Auth] Detectado ?reset_password=true — aguardando Supabase processar recovery token...');
+      console.log('[Auth] Detectado ?reset_password=true — aguardando recovery token...');
       setTimeout(async () => {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) {
-          console.warn('[Auth] Erro ao obter sessao de recovery:', sessionError.message);
-        }
+        if (sessionError) console.warn('[Auth] Erro ao obter sessao de recovery:', sessionError.message);
         if (session?.user) {
           console.log('[Auth] ✅ Sessao de recovery confirmada para:', session.user.email);
           window.dispatchEvent(new CustomEvent('open-reset-password-modal'));
         } else {
-          console.warn('[Auth] ❌ Nenhuma sessao de recovery encontrada apos delay');
+          console.warn('[Auth] ❌ Nenhuma sessao de recovery encontrada');
         }
         if (window.location.hash.includes('access_token=') || window.location.hash.includes('type=recovery')) {
           window.history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -644,49 +618,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchProfile, autoProvisionProfile, isGoogleProvider]);
 
   // ============================================================
-  // onAuthStateChange — backup para logins futuros
+  // onAuthStateChange
   // ============================================================
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('[Auth] [onAuthStateChange]', event, session?.user?.email || 'no user');
 
-      // >>> PROTECAO FLUXO DE RECUPERACAO DE SENHA <<<
       if (event === 'PASSWORD_RECOVERY') {
-        console.log('[Auth] [onAuthStateChange] 🔒 PASSWORD_RECOVERY detectado — ignorando verificacoes de profile');
+        console.log('[Auth] [onAuthStateChange] 🔒 PASSWORD_RECOVERY — ignorando');
         return;
       }
 
       if (event === 'SIGNED_IN' && session?.user) {
-        // Verifica se estamos em fluxo de recovery antes de verificar profile
         const isRecoveryFlow = new URLSearchParams(window.location.search).get('reset_password') === 'true';
         if (isRecoveryFlow) {
-          console.log('[Auth] [SIGNED_IN] 🔒 Fluxo de RECOVERY — ignorando verificacao de profile, mantendo sessao');
+          console.log('[Auth] [SIGNED_IN] 🔒 RECOVERY — ignorando verificacao');
           return;
         }
 
-        // Verifica profile em background — NAO salva cache se profile nao existe
         (async () => {
-          if (getAuth()?.id === session.user!.id) return; // ja tem cache
+          if (getAuth()?.id === session.user!.id) return;
 
-          // Verifica se profile existe
           const { data: profileCheck } = await supabase.from('profiles').select('id').eq('id', session.user!.id).maybeSingle();
 
           if (!profileCheck) {
-            // >>> AUTO-PROVISIONAMENTO PARA GOOGLE OAUTH <<<
             if (isGoogleProvider(session.user)) {
               console.log('[Auth] [SIGNED_IN] Profile ausente + Google — auto-provisionando...');
-              await autoProvisionProfile(session.user);
+              const provisioned = await autoProvisionProfile(session.user);
+              if (provisioned) {
+                setNeedsOnboarding(true);
+              }
               setIsLoading(false);
               return;
             }
-
-            console.log('[Auth] [SIGNED_IN] Profile nao encontrado (conta deletada), NAO salvando cache:', session.user!.email);
+            console.log('[Auth] [SIGNED_IN] Profile nao encontrado:', session.user!.email);
             return;
           }
 
-          console.log('[Auth] [SIGNED_IN] Profile OK, salvando:', session.user!.email);
+          console.log('[Auth] [SIGNED_IN] Profile OK:', session.user!.email);
           const email = session.user!.email || '';
-           const user: User = {
+          const user: User = {
             id: session.user!.id,
             email,
             name: session.user!.user_metadata?.full_name || email.split('@')[0] || '',
@@ -706,6 +677,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null);
         clearAuth();
         setIsLoading(false);
+        setNeedsOnboarding(false);
       }
     });
 
@@ -716,8 +688,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      currentUser, profile, isLoading, isAdmin, theme: 'dark' as const, isAuthReady: !isLoading, // Dark Mode exclusivo
-      users: [], blockMessage, login, logout, updateProfile, loginWithGoogle, register, resetPassword,
+      currentUser, profile, isLoading, isAdmin, theme: 'dark' as const, isAuthReady: !isLoading,
+      users: [], blockMessage, needsOnboarding, dismissOnboarding,
+      login, logout, updateProfile, loginWithGoogle, register, resetPassword,
       addUser, deleteUser, deleteAccount, updateUserProfile, updatePassword, updateTheme, getUserFavorites,
     }}>
       {children}
