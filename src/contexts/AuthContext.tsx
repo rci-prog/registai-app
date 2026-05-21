@@ -263,20 +263,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchProfile, checkUserBlocked]);
 
-  // REGISTER — com recuperacao para contas deletadas
+  // REGISTER — com reativação transparente para contas deletadas
   const register = useCallback(async (email: string, password: string, name: string): Promise<{ success: boolean; message: string }> => {
     try {
       console.log('[Auth] [register] ===== INICIO =====', email);
 
-      const { data: oldProfile } = await supabase.from('profiles').select('id,email').eq('email', email).maybeSingle();
-      console.log('[Auth] [register] 1. Profile antigo:', oldProfile);
-      if (oldProfile) {
-        await supabase.from('profiles').delete().eq('email', email);
-        console.log('[Auth] [register] 2. Profile antigo deletado');
-      }
-
-      console.log('[Auth] [register] 3. Chamando signUp...');
-      const { data, error } = await supabase.auth.signUp({
+      console.log('[Auth] [register] 1. Tentando signUp...');
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -285,120 +278,226 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      await supabase.auth.signOut();
-      clearAuth();
-
-      console.log('[Auth] [register] 4. signUp retornou:', {
-        hasUser: !!data.user,
-        hasSession: !!data.session,
-        error: error?.message || null,
-        userId: data.user?.id || null,
-        userEmail: data.user?.email || null,
+      console.log('[Auth] [register] 2. signUp retornou:', {
+        hasUser: !!signUpData?.user,
+        hasSession: !!signUpData?.session,
+        error: signUpError?.message || null,
+        identities: signUpData?.user?.identities?.length || 0,
       });
 
-      if (error) {
-        console.log('[Auth] [register] 5. ERROR:', error.message);
-        return { success: false, message: error.message };
+      // ============================================================
+      // CASO A: SignUp bem-sucedido com session → NOVO usuário
+      // ============================================================
+      if (!signUpError && signUpData?.session && signUpData?.user) {
+        console.log('[Auth] [register] 3a. NOVO usuario confirmado. ID:', signUpData.user.id);
+
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', signUpData.user.id)
+          .maybeSingle();
+
+        if (!existingProfile) {
+          const isAdminUser = email === ADMIN_EMAIL;
+          const newProfile = {
+            id: signUpData.user.id,
+            email,
+            full_name: name,
+            avatar_url: '',
+            role: isAdminUser ? 'admin' : 'user',
+            theme: 'dark',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          const { error: profileError } = await supabase.from('profiles').insert(newProfile);
+          if (profileError) {
+            console.warn('[Auth] [register] Erro ao criar profile:', profileError.message);
+          } else {
+            console.log('[Auth] [register] ✅ Profile criado');
+          }
+        }
+
+        const user: User = {
+          id: signUpData.user.id,
+          email,
+          name,
+          avatar: '',
+          role: email === ADMIN_EMAIL ? 'admin' : 'user',
+          createdAt: new Date(signUpData.user.created_at || Date.now()),
+        };
+        setCurrentUser(user);
+        saveAuth(user);
+        setProfile({
+          id: signUpData.user.id, email, name, avatar: '',
+          role: email === ADMIN_EMAIL ? 'admin' : 'user', theme: 'dark',
+        });
+        console.log('[Auth] [register] ===== SUCESSO (novo usuario) =====');
+        return { success: true, message: 'Conta criada! Verifique seu e-mail para confirmar a conta antes de fazer login.' };
       }
 
-      if (!data.user) {
-        console.log('[Auth] [register] 5. Sem user no retorno');
-        return { success: false, message: 'Erro ao criar conta.' };
+      // ============================================================
+      // CASO B: SignUp bem-sucedido SEM session → email já existe
+      // ============================================================
+      if (!signUpError && signUpData?.user && !signUpData.session) {
+        console.log('[Auth] [register] 3b. SignUp sem session — possivel email duplicado');
+
+        const { data: profileCheck } = await supabase
+          .from('profiles')
+          .select('id,email')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (profileCheck) {
+          console.log('[Auth] [register] 3b.1. Conta ATIVA — email já cadastrado');
+          return { success: false, message: 'Este e-mail já está cadastrado. Faça login com sua senha.' };
+        }
+
+        // Profile NÃO existe → CONTA DELETADA detectada
+        console.log('[Auth] [register] 3b.2. CONTA DELETADA detectada — tentando reativar...');
+
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+
+        if (loginError || !loginData?.user) {
+          console.log('[Auth] [register] 3b.3. Login falhou:', loginError?.message);
+          return {
+            success: false,
+            message: 'Este e-mail já foi usado anteriormente e a conta foi encerrada. Para reativar, digite a mesma senha que usava. Se esqueceu a senha, use "Esqueci a senha" na tela de login.',
+          };
+        }
+
+        // Login OK → reativar profile via UPSERT
+        console.log('[Auth] [register] 3b.4. Login OK — reativando profile...');
+        const isAdminUser = email === ADMIN_EMAIL;
+        const reactivatedProfile = {
+          id: loginData.user.id,
+          email,
+          full_name: name || loginData.user.user_metadata?.full_name || email.split('@')[0],
+          avatar_url: loginData.user.user_metadata?.avatar_url || '',
+          role: isAdminUser ? 'admin' : 'user',
+          theme: 'dark',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error: upsertError } = await supabase
+          .from('profiles')
+          .upsert(reactivatedProfile, { onConflict: 'id', ignoreDuplicates: false });
+
+        if (upsertError) {
+          console.error('[Auth] [register] Erro no upsert de reativação:', upsertError.message);
+        } else {
+          console.log('[Auth] [register] ✅ Profile reativado via upsert');
+        }
+
+        const user: User = {
+          id: loginData.user.id,
+          email: loginData.user.email || email,
+          name: reactivatedProfile.full_name,
+          avatar: reactivatedProfile.avatar_url,
+          role: isAdminUser ? 'admin' : 'user',
+          createdAt: new Date(loginData.user.created_at),
+        };
+        setCurrentUser(user);
+        saveAuth(user);
+        setProfile({
+          id: loginData.user.id, email,
+          name: reactivatedProfile.full_name,
+          avatar: reactivatedProfile.avatar_url,
+          role: isAdminUser ? 'admin' : 'user', theme: 'dark',
+        });
+        setNeedsOnboarding(true);
+
+        console.log('[Auth] [register] ===== REATIVAÇÃO TRANSPARENTE OK =====');
+        return { success: true, message: 'Conta reativada com sucesso! Bem-vindo de volta.' };
       }
 
-      if (!data.session) {
-        const { data: profileCheck } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
-        console.log('[Auth] [register] 5. Profile check:', profileCheck ? 'ATIVO' : 'DELETADO');
+      // ============================================================
+      // CASO C: Erro no signUp → analisar tipo de erro
+      // ============================================================
+      if (signUpError) {
+        const errorMsg = signUpError.message.toLowerCase();
+        const isDuplicateError =
+          errorMsg.includes('already registered') ||
+          errorMsg.includes('already exists') ||
+          errorMsg.includes('user already') ||
+          errorMsg.includes('duplicate');
 
-        if (!profileCheck) {
-          console.log('[Auth] [register] 5b. Conta deletada detectada. Tentando reativacao...');
+        console.log('[Auth] [register] 3c. Erro no signUp:', signUpError.message, '| isDuplicate:', isDuplicateError);
+
+        if (isDuplicateError) {
+          const { data: profileCheck } = await supabase
+            .from('profiles')
+            .select('id,email')
+            .eq('email', email)
+            .maybeSingle();
+
+          if (profileCheck) {
+            console.log('[Auth] [register] 3c.1. Conta ATIVA — sugerindo login');
+            return { success: false, message: 'Este e-mail já está cadastrado. Faça login com sua senha.' };
+          }
+
+          // CONTA DELETADA — tentar reativar
+          console.log('[Auth] [register] 3c.2. CONTA DELETADA — tentando reativar...');
           const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
-          if (loginError || !loginData.user) {
-            console.log('[Auth] [register] 6. Reativacao falhou:', loginError?.message);
+
+          if (loginError || !loginData?.user) {
+            console.log('[Auth] [register] 3c.3. Login falhou:', loginError?.message);
             return {
               success: false,
-              message: 'Esta conta foi removida anteriormente. Para recuperar o acesso com este e-mail, use a opcao "Esqueci a senha" na tela de login. Para criar uma conta nova, utilize um e-mail diferente.',
+              message: 'Este e-mail já foi usado anteriormente e a conta foi encerrada. Para reativar, digite a mesma senha que usava. Se esqueceu a senha, use "Esqueci a senha" na tela de login.',
             };
           }
-          console.log('[Auth] [register] 7. Reativacao OK. Recriando profile...');
+
+          // Login OK → reativar
+          console.log('[Auth] [register] 3c.4. Login OK — reativando...');
           const isAdminUser = email === ADMIN_EMAIL;
-          const recreatedProfile = {
+          const reactivatedProfile = {
             id: loginData.user.id,
             email,
-            full_name: loginData.user.user_metadata?.full_name || name || email.split('@')[0],
+            full_name: name || loginData.user.user_metadata?.full_name || email.split('@')[0],
             avatar_url: loginData.user.user_metadata?.avatar_url || '',
             role: isAdminUser ? 'admin' : 'user',
             theme: 'dark',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };
-          await supabase.from('profiles').insert(recreatedProfile);
+
+          await supabase
+            .from('profiles')
+            .upsert(reactivatedProfile, { onConflict: 'id', ignoreDuplicates: false });
+
           const user: User = {
             id: loginData.user.id,
             email: loginData.user.email || email,
-            name: recreatedProfile.full_name,
-            avatar: recreatedProfile.avatar_url,
+            name: reactivatedProfile.full_name,
+            avatar: reactivatedProfile.avatar_url,
             role: isAdminUser ? 'admin' : 'user',
             createdAt: new Date(loginData.user.created_at),
           };
           setCurrentUser(user);
           saveAuth(user);
-          fetchProfile(loginData.user.id);
+          setProfile({
+            id: loginData.user.id, email,
+            name: reactivatedProfile.full_name,
+            avatar: reactivatedProfile.avatar_url,
+            role: isAdminUser ? 'admin' : 'user', theme: 'dark',
+          });
+          setNeedsOnboarding(true);
+
+          console.log('[Auth] [register] ===== REATIVAÇÃO TRANSPARENTE OK =====');
           return { success: true, message: 'Conta reativada com sucesso! Bem-vindo de volta.' };
         }
 
-        console.log('[Auth] [register] 5c. Conta ativa. Tentando login...');
-        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
-        if (loginError || !loginData.user) {
-          console.log('[Auth] [register] 6. Login falhou:', loginError?.message);
-          return { success: false, message: 'Este e-mail ja esta cadastrado. Use a opcao "Esqueci a senha" na tela de login ou entre com sua senha correta.' };
-        }
-        console.log('[Auth] [register] 7. Login OK com credenciais existentes');
-        const user: User = {
-          id: loginData.user.id,
-          email: loginData.user.email || email,
-          name: loginData.user.user_metadata?.full_name || name || email.split('@')[0],
-          avatar: loginData.user.user_metadata?.avatar_url || '',
-          role: email === ADMIN_EMAIL ? 'admin' : 'user',
-          createdAt: new Date(loginData.user.created_at),
-        };
-        setCurrentUser(user);
-        saveAuth(user);
-        fetchProfile(loginData.user.id);
-        return { success: true, message: 'Login realizado com sucesso!' };
+        // Erro genérico do signUp
+        console.log('[Auth] [register] 3d. Erro genérico:', signUpError.message);
+        return { success: false, message: signUpError.message };
       }
 
-      console.log('[Auth] [register] 5. Novo usuario. ID:', data.user.id);
-      const isAdminUser = email === ADMIN_EMAIL;
-      const newProfile = {
-        id: data.user.id,
-        email,
-        full_name: name,
-        avatar_url: '',
-        role: isAdminUser ? 'admin' : 'user',
-        theme: 'dark',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      const { error: profileError } = await supabase.from('profiles').insert(newProfile);
-      console.log('[Auth] [register] 6. Profile insert:', { error: profileError?.message || 'OK' });
-
-      if (profileError) {
-        return { success: true, message: 'Conta criada, mas erro ao salvar perfil.' };
-      }
-
-      const user: User = {
-        id: data.user.id, email, name, avatar: '',
-        role: isAdminUser ? 'admin' : 'user',
-        createdAt: new Date(data.user.created_at || Date.now()),
-      };
-      setCurrentUser(user);
-      saveAuth(user);
-      setProfile({ id: data.user.id, email, name, avatar: '', role: isAdminUser ? 'admin' : 'user', theme: 'dark' });
-      console.log('[Auth] [register] ===== SUCESSO =====');
-      return { success: true, message: 'Conta criada! Verifique seu e-mail para confirmar a conta antes de fazer login.' };
+      // Caso inesperado
+      console.warn('[Auth] [register] Caso inesperado');
+      return { success: false, message: 'Erro ao processar cadastro. Tente novamente.' };
     } catch (error: any) {
-      console.error('[Auth] [register] ===== ERRO =====', error);
+      console.error('[Auth] [register] ===== ERRO CATCH =====', error);
       return { success: false, message: error?.message || 'Erro ao criar conta.' };
     }
   }, []);
