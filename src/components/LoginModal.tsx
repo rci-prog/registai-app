@@ -29,14 +29,14 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
   const [error, setError] = useState(initialError || '');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Atualizar erro quando initialError muda (ex: apos redirect do Google com conta bloqueada)
+  // Atualizar erro quando initialError muda (ex: após redirect do Google com conta bloqueada)
   useEffect(() => {
     if (initialError) {
       setError(initialError);
     }
   }, [initialError]);
 
-  // Escutar evento para abrir modal de nova senha (quando usuario clica no link do e-mail)
+  // Escutar evento para abrir modal de nova senha (quando usuário clica no link do e-mail)
   useEffect(() => {
     const handler = () => {
       console.log('[LoginModal] Evento open-reset-password-modal recebido');
@@ -89,8 +89,8 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     e.preventDefault();
     setError('');
     if (!newPassword.trim()) { setError('Digite a nova senha.'); return; }
-    if (newPassword.length < 6) { setError('A senha deve ter no minimo 6 caracteres.'); return; }
-    if (newPassword !== confirmNewPassword) { setError('As senhas nao coincidem.'); return; }
+    if (newPassword.length < 6) { setError('A senha deve ter no mínimo 6 caracteres.'); return; }
+    if (newPassword !== confirmNewPassword) { setError('As senhas não coincidem.'); return; }
     setIsLoading(true);
     try {
       const result = await updatePassword('', newPassword);
@@ -135,7 +135,7 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     // Se sucesso, o navegador sera redirecionado pelo Supabase
   };
 
-    const handleRegister = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -343,7 +343,7 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
                 Senha atualizada com sucesso!
               </h3>
               <p className="text-sm text-slate-400">
-                Sua senha foi redefinida. Agora voce pode fazer login com a nova senha.
+                Sua senha foi redefinida. Agora você pode fazer login com a nova senha.
               </p>
               <Button
                 onClick={() => { setShowNewPassword(false); setPasswordUpdated(false); }}
@@ -654,13 +654,14 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
                         Contatar administrador
                       </button>
                     )}
-                    {error.includes('removida') && (
+                    {error.includes('conta anterior') && (
                       <button
+                        type="button"
                         className="inline-flex items-center gap-1 mt-2 text-violet-400 hover:text-violet-300 transition-colors text-xs font-medium"
-                        onClick={() => setSupportOpen(true)}
+                        onClick={() => { setShowForgotPassword(true); setError(''); setResetEmail(registerEmail); }}
                       >
-                        <HelpCircle className="w-3 h-3" />
-                        Contatar administrador
+                        <KeyRound className="w-3 h-3" />
+                        Esqueci a senha
                       </button>
                     )}
                   </div>
