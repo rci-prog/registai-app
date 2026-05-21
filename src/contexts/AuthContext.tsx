@@ -362,13 +362,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await supabase.auth.signOut();
-    clearAuth();
-    setCurrentUser(null);
-    setProfile(null);
-    setBlockMessage(null);
-    setNeedsOnboarding(false);
-  }, []);
+  await supabase.auth.signOut();
+  clearAuth();
+  setCurrentUser(null);
+  setProfile(null);
+  setBlockMessage(null);
+  setNeedsOnboarding(false);
+  
+  // Limpa o token armazenado pelo Supabase no localStorage
+  localStorage.removeItem('supabase.auth.token');
+  
+  // Opcional: descomente a linha abaixo se o loop de login persistir
+  // window.location.href = window.location.origin; 
+}, []);
 
   const updateProfile = useCallback(async (updates: Partial<Profile>) => {
     if (!currentUserRef.current?.id) return;
