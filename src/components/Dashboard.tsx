@@ -156,23 +156,32 @@ if ((isReactive || isBlocked) && !isBlockedRef.current) {
 }
         // -----------------------------------------------------------------
 
-        if (!profileData) {
+       if (!profileData) {
           console.log('[Dashboard] [verifyUser] Usuario deletado detectado, fazendo signOut');
           await logout();
           setLoginError('Esta conta foi removida. Cadastre-se novamente para acessar.');
           setIsLoginOpen(true);
           return;
         }
-        
+
+        // --- LÓGICA CONSOLIDADA DE BLOQUEIO ---
         const rawBlocked = profileData?.is_blocked;
-        const isBlocked = rawBlocked === true || rawBlocked === 'true' || rawBlocked === 1 || rawBlocked === 't';
-        if (isBlocked) {
-          console.log('[Dashboard] [verifyUser] 🚫 Usuario BLOQUEADO detectado, fazendo signOut:', currentUser.email);
+        const isBlockedByAdmin = rawBlocked === true || rawBlocked === 'true' || rawBlocked === 1 || rawBlocked === 't';
+        const isBlockedByReativacao = sessionStorage.getItem('bloqueio_reativacao_ativo') === 'true';
+
+        if (isBlockedByAdmin || isBlockedByReativacao) {
+          console.log('[Dashboard] [verifyUser] 🚫 Acesso negado. Motivo:', isBlockedByReativacao ? 'Reativação' : 'Admin');
+          
           await logout();
-          setLoginError('Sua conta foi suspensa. Entre em contato com o suporte.');
+          
+          setLoginError(isBlockedByReativacao 
+            ? 'Conta reativada! Por favor, faça login novamente para aceitar os termos.' 
+            : 'Sua conta foi suspensa. Entre em contato com o suporte.');
+            
           setIsLoginOpen(true);
           return;
         }
+        // ---------------------------------------
         
         console.log('[Dashboard] [verifyUser] ✅ Usuario OK:', currentUser.email);
       } catch (e: any) {
