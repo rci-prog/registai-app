@@ -119,6 +119,7 @@ useEffect(() => {
           return;
         }
 
+        // 1. Buscamos as informações básicas do profile
         const resp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,is_blocked&id=eq.${currentUser.id}`, {
           method: 'GET',
           headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
@@ -127,23 +128,32 @@ useEffect(() => {
           console.log('[Dashboard] [verifyUser] Fetch erro:', resp.status);
           return;
         }
-        const data = await resp.json();
+        const data = await resp.ok ? await resp.json() : [];
         const profileData = data?.[0];
         console.log('[Dashboard] [verifyUser] Resultado:', currentUser.email, 'is_blocked:', profileData?.is_blocked, 'existe:', !!profileData);
         
-        // --- TRAVA DE REATIVAÇÃO APÓS EXCLUSÃO ---
-        const acabouDeDeletar = sessionStorage.getItem('registai_conta_deletada_reciente') === 'true';
+        // --- TRAVA COMPLEMENTAR DE REATIVAÇÃO INTEGRADA ---
         const provider = currentUser?.app_metadata?.provider || currentUser?.identities?.[0]?.provider;
+        
+        // Pegamos a data de criação da identidade atual do usuário logado
+        const identityCreatedAt = currentUser?.identities?.[0]?.created_at 
+          ? new Date(currentUser.identities[0].created_at).getTime() 
+          : new Date(currentUser?.created_at || 0).getTime();
+          
+        const agoraLocal = new Date().getTime();
+        const diferencaJanelaSegundos = Math.abs(agoraLocal - identityCreatedAt) / 1000;
 
-        if (acabouDeDeletar && provider === 'google') {
-          console.log('[Dashboard] [verifyUser] 🔄 Reativação recente detectada via sessionStorage!');
-          sessionStorage.removeItem('registai_conta_deletada_reciente');
+        console.log('[Dashboard] [verifyUser] Provedor:', provider, '| Diferença em seg:', diferencaJanelaSegundos);
+
+        // Se a identidade foi gerada nos últimos 15 segundos, intercepta o login direto
+        if (provider === 'google' && diferencaJanelaSegundos < 15) {
+          console.log('[Dashboard] [verifyUser] 🚨 Conta Google criada ou reativada recentemente detectada!');
           await logout();
-          setLoginError('Conta reativada com sucesso! Faça login novamente para aceitar os termos.');
+          setLoginError('Conta reativada com sucesso! Por favor, faça login novamente para aceitar os termos de uso.');
           setIsLoginOpen(true);
           return;
         }
-        // ------------------------------------------
+        // --------------------------------------------------
 
         if (!profileData) {
           console.log('[Dashboard] [verifyUser] Usuario deletado detectado, fazendo signOut');
