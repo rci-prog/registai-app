@@ -383,7 +383,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loginWithGoogle = useCallback(async () => {
-    const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}?reactive=true` } });
+    // Se ele clicar no botão e a URL for de reativação, marcamos no session
+    sessionStorage.setItem('registai_conta_deletada_reciente', 'true');
+
+    const { data, error } = await supabase.auth.signInWithOAuth({ 
+      provider: 'google', 
+      options: { redirectTo: `${window.location.origin}?reactive=true` } 
+    });
+    
     if (error) return { success: false, message: error.message };
     if (data.url) window.location.href = data.url;
     return { success: true, message: 'Redirecionando...' };
