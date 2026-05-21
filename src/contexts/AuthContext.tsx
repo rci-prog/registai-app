@@ -29,7 +29,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   loginWithGoogle: () => Promise<{ success: boolean; message: string }>;
-  register: (email: string, password: string, name: string) => Promise<{ success: boolean; message: string }>;
+  register: (email: string, password: string, name: string) => Promise<{ success: boolean; message: string; isDeletedAccountWithNewPassword?: boolean }>;
   resetPassword: (email: string) => Promise<{ success: boolean; message: string }>;
   addUser: (email: string, role: string) => Promise<{ success: boolean; message: string }>;
   deleteUser: (id: string) => Promise<{ success: boolean; message: string }>;
@@ -97,7 +97,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
 
       console.log('[Auth] [autoProvision] Upsert profile para Google OAuth:', email);
-      // UPSERT: insere se nao existe, atualiza se existe (evita erro 409)
       const { error } = await supabase
         .from('profiles')
         .upsert(profilePayload, { onConflict: 'id', ignoreDuplicates: false });
@@ -264,7 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchProfile, checkUserBlocked]);
 
   // REGISTER — com reativação transparente para contas deletadas
-  const register = useCallback(async (email: string, password: string, name: string): Promise<{ success: boolean; message: string }> => {
+  const register = useCallback(async (email: string, password: string, name: string): Promise<{ success: boolean; message: string; isDeletedAccountWithNewPassword?: boolean }> => {
     try {
       console.log('[Auth] [register] ===== INICIO =====', email);
 
@@ -361,7 +360,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('[Auth] [register] 3b.3. signIn falhou (senha diferente da antiga):', loginError?.message);
           return {
             success: false,
-            message: 'Uma conta anterior foi encontrada com este e-mail. Para reativa-la, digite a senha que usava antes de encerrar a conta. Se nao lembra, clique em "Esqueci a senha".',
+            message: 'Uma conta anterior foi encontrada com este e-mail. Para reativa-la agora com sua nova senha, clique em "Reativar Conta" abaixo.',
+            isDeletedAccountWithNewPassword: true,
           };
         }
 
@@ -444,7 +444,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log('[Auth] [register] 3c.3. signIn falhou (senha diferente da antiga):', loginError?.message);
             return {
               success: false,
-              message: 'Uma conta anterior foi encontrada com este e-mail. Para reativa-la, digite a senha que usava antes de encerrar a conta. Se nao lembra, clique em "Esqueci a senha".',
+              message: 'Uma conta anterior foi encontrada com este e-mail. Para reativa-la agora com sua nova senha, clique em "Reativar Conta" abaixo.',
+              isDeletedAccountWithNewPassword: true,
             };
           }
 
@@ -754,7 +755,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'PASSWORD_RECOVERY') {
         console.log('[Auth] [onAuthStateChange] 🔒 PASSWORD_RECOVERY — flag ativada');
         return;
-      }
+n      }
 
       if (event === 'SIGNED_IN' && session?.user) {
         // Se estamos em sessao de recovery (apos clicar no link do e-mail),
