@@ -291,27 +291,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (signUpData?.user) {
-        const isAdminUser = email === ADMIN_EMAIL;
-        
-        // Monta o estado local do usuário baseado no que acabou de ser criado no banco
-        const user: User = {
-          id: signUpData.user.id,
-          email,
-          name,
-          avatar: '',
-          role: isAdminUser ? 'admin' : 'user',
-          createdAt: new Date(signUpData.user.created_at || Date.now()),
+        // 🚀 REMOVEMOS: setCurrentUser, saveAuth e setProfile daqui!
+        // Assim o front-end não finge que o usuário já está logado antes de confirmar o e-mail.
+
+        console.log('[Auth] [register] ✅ Cadastro pré-registrado. Aguardando confirmação de e-mail.');
+        return { 
+          success: true, 
+          message: 'Conta criada! Enviamos um link de confirmação para o seu e-mail. Por favor, verifique sua caixa de entrada ou spam antes de fazer o primeiro login.' 
         };
-
-        setCurrentUser(user);
-        saveAuth(user);
-        setProfile({
-          id: signUpData.user.id, email, name, avatar: '',
-          role: isAdminUser ? 'admin' : 'user', theme: 'dark',
-        });
-
-        console.log('[Auth] [register] ✅ Cadastro concluído localmente');
-        return { success: true, message: 'Conta criada! Verifique seu e-mail para confirmar a conta antes de fazer login.' };
       }
 
       return { success: false, message: 'Erro ao processar cadastro. Tente novamente.' };
