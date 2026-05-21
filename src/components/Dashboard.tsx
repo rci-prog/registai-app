@@ -170,10 +170,10 @@ useEffect(() => {
       } catch (e: any) {
         console.error('[Dashboard] [verifyUser] Erro:', e.message);
       }
-    }; // <-- Fecha a função verifyUser de verdade aqui
+    };
 
     verifyUser();
-  }, [currentUser?.id]); // <-- Só um useEffect fechando aqui embaixo!
+  }, [currentUser?.id]);
   // Escuta evento para abrir modal de login (apos redefinicao de senha)
   useEffect(() => {
     const handler = () => {
