@@ -1030,8 +1030,8 @@ useEffect(() => {
           console.log('[Dashboard] Marcando conta como deletada recentemente no localStorage');
           localStorage.setItem('registai_conta_deletada_reciente', 'true');
           await deleteAccount();
-        }} // <-- Fecha a função E a propriedade aqui
-      /> // <-- Fecha a tag do componente aqui sozinho
+        }}
+      />
 
       {/* Admin Panel */}
       {isAdmin && (
