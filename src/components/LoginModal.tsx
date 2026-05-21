@@ -135,7 +135,7 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     // Se sucesso, o navegador sera redirecionado pelo Supabase
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
+    const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -155,15 +155,44 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     const result = await register(registerEmail, registerPassword, registerName);
     
     if (result.success) {
-      // Cadastro com confirmacao por e-mail — nao faz login automatico
-      setRegisterSuccess(true);
-      setRegisterMessage(result.message || 'Cadastro realizado! Verifique seu e-mail para confirmar a conta.');
-      setRegisterName('');
-      setRegisterEmail('');
-      setRegisterPassword('');
-      setConfirmPassword('');
+      // Se a mensagem indica reativacao (login automatico), fechar modal direto
+      if (result.message.includes('reativada') || result.message.includes('Bem-vindo de volta')) {
+        setRegisterName('');
+        setRegisterEmail('');
+        setRegisterPassword('');
+        setConfirmPassword('');
+        onClose();
+      } else {
+        // Cadastro novo com confirmacao por e-mail
+        setRegisterSuccess(true);
+        setRegisterMessage(result.message || 'Cadastro realizado! Verifique seu e-mail para confirmar a conta.');
+        setRegisterName('');
+        setRegisterEmail('');
+        setRegisterPassword('');
+        setConfirmPassword('');
+      }
     } else {
-      setError(result.message);
+      // Cadastro falhou — verificar se é conta deletada e tentar login automatico
+      const isAccountDeletedError = 
+        result.message.includes('reativar') || 
+        result.message.includes('encerrada');
+      
+      if (isAccountDeletedError) {
+        console.log('[LoginModal] Tentando login automatico apos cadastro falho...');
+        const loginResult = await login(registerEmail, registerPassword);
+        if (loginResult.success) {
+          console.log('[LoginModal] Login automatico OK — fechando modal');
+          setRegisterName('');
+          setRegisterEmail('');
+          setRegisterPassword('');
+          setConfirmPassword('');
+          onClose();
+        } else {
+          setError('Este e-mail ja esta em uso por outra conta. Se esta conta for sua, faca login ou recupere sua senha.');
+        }
+      } else {
+        setError(result.message);
+      }
     }
     setIsLoading(false);
   };
