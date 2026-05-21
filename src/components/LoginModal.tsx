@@ -146,6 +146,9 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
       setError(result.message);
     }
 
+    setIsLoading(false); // Garante que encerra o loading se der erro
+  }; // <-- ADICIONE ESSA CHAVE AQUI PARA FECHAR O HANDLELOGIN!
+
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setError('');
