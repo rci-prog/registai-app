@@ -121,14 +121,30 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     const result = await login(loginEmail, loginPassword);
     
     if (result.success) {
-      setLoginEmail('');
-      setLoginPassword('');
-      onClose();
+      // Se for um fluxo OAuth (Google) que veio confirmado, fecha o modal direto 
+      // para o app seguir com a tela de aceite de termos
+      if (result.isOAuth) {
+        setIsLoginOpen(false);
+        return;
+      }
+
+      // Se for e-mail tradicional, exibe a mensagem e fecha após 5 segundos
+      setRegisterSuccess(true);
+      setRegisterMessage(result.message || 'Cadastro realizado! Verifique seu e-mail para confirmar a conta.');
+      
+      setRegisterName('');
+      setRegisterEmail('');
+      setRegisterPassword('');
+      setConfirmPassword('');
+
+      setTimeout(() => {
+        setIsLoginOpen(false);
+        setRegisterSuccess(false);
+      }, 5000);
+
     } else {
       setError(result.message);
     }
-    setIsLoading(false);
-  };
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
