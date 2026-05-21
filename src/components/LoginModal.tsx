@@ -175,27 +175,34 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     const result = await register(registerEmail, registerPassword, registerName);
     
     if (result.success) {
+      // Se for um fluxo OAuth (Google) que veio confirmado, fecha o modal direto 
+      // para o app seguir com a tela de aceite de termos
+      if (result.isOAuth) {
+        setIsLoginOpen(false);
+        setIsLoading(false); // Garante que desativa o loading antes de sair
+        return;
+      }
+
+      // Se for e-mail tradicional, exibe a mensagem e fecha após 5 segundos
       setRegisterSuccess(true);
       setRegisterMessage(result.message || 'Cadastro realizado! Verifique seu e-mail para confirmar a conta.');
       
-      // Limpa os campos do formulário
       setRegisterName('');
       setRegisterEmail('');
       setRegisterPassword('');
       setConfirmPassword('');
 
-      // ✅ Destrava a tela: Fecha o modal automaticamente após 5 segundos 
-      // para dar tempo do usuário ler a mensagem de sucesso com calma.
       setTimeout(() => {
-        setIsLoginOpen(false); // Fecha o modal
-        setRegisterSuccess(false); // Reseta o estado de sucesso para a próxima vez
+        setIsLoginOpen(false);
+        setRegisterSuccess(false);
       }, 5000);
 
     } else {
       setError(result.message);
     }
+    
     setIsLoading(false);
-  };
+  }; // <-- Essa era a chave que tinha ficado órfã ou faltando!
 
   const handleReactivateWithOTP = async () => {
     setError('');
