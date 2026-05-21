@@ -1037,10 +1037,10 @@ if (reativacaoPendente) {
         theme={theme}
         onUpdate={updateProfile}
         onDeleteAccount={async () => {
-          // Grava o cookie que expira em 1 hora (tempo mais que suficiente para o login)
-          document.cookie = "reativacao_pendente=true; max-age=3600; path=/";
-          await deleteAccount();
-        }}
+  // Define cookie de sessão (sem max-age)
+  document.cookie = "reativacao_pendente=true; path=/";
+  await deleteAccount();
+}}
       />
 
       {/* Admin Panel */}
