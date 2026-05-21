@@ -100,7 +100,6 @@ useEffect(() => {
       if (!currentUser?.id) return;
       console.log('[Dashboard] [verifyUser] Verificando usuario:', currentUser.email);
       try {
-        // 1. Pegamos os dados da sessão guardados pelo próprio Supabase Auth no localStorage
         const storageKey = Object.keys(localStorage).find(key => key.startsWith('sb-') && key.endsWith('-auth-token'));
         let isEmailConfirmed = true;
 
@@ -115,14 +114,12 @@ useEffect(() => {
           }
         }
 
-        // Se o e-mail NÃO está confirmado, ele é um usuário pendente de verificação.
         if (!isEmailConfirmed) {
           console.log('[Dashboard] [verifyUser] ⏳ Usuário com e-mail pendente de confirmação. Ignorando checagem de exclusão.');
           return;
         }
 
-        // Fetch direto = bypass RLS, trazendo também o created_at
-        const resp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,is_blocked,created_at&id=eq.${currentUser.id}`, {
+        const resp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,is_blocked&id=eq.${currentUser.id}`, {
           method: 'GET',
           headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
         });
@@ -134,24 +131,24 @@ useEffect(() => {
         const profileData = data?.[0];
         console.log('[Dashboard] [verifyUser] Resultado:', currentUser.email, 'is_blocked:', profileData?.is_blocked, 'existe:', !!profileData);
         
+        // --- TRAVA DE REATIVAÇÃO APÓS EXCLUSÃO ---
+        const acabouDeDeletar = localStorage.getItem('registai_conta_deletada_reciente') === 'true';
+        const provider = currentUser?.app_metadata?.provider || currentUser?.identities?.[0]?.provider;
+
+        if (acabouDeDeletar && provider === 'google') {
+          console.log('[Dashboard] [verifyUser] 🔄 Reativação recente detectada via marcador local!');
+          localStorage.removeItem('registai_conta_deletada_reciente');
+          await logout();
+          setLoginError('Conta reativada com sucesso! Faça login novamente para aceitar os termos.');
+          setIsLoginOpen(true);
+          return;
+        }
+        // ------------------------------------------
+
         if (!profileData) {
           console.log('[Dashboard] [verifyUser] Usuario deletado detectado, fazendo signOut');
           await logout();
           setLoginError('Esta conta foi removida. Cadastre-se novamente para acessar.');
-          setIsLoginOpen(true);
-          return;
-        }
-
-        // Trava inteligente apenas para contas Google recém-criadas/recriadas
-        const createdAt = new Date(profileData.created_at).getTime();
-        const agora = new Date().getTime();
-        const diferencaSegundos = (agora - createdAt) / 1000;
-        const provider = currentUser?.app_metadata?.provider || currentUser?.identities?.[0]?.provider;
-
-        if (provider === 'google' && diferencaSegundos < 10) {
-          console.log('[Dashboard] [verifyUser] 🆕 Conta Google recém-criada/recriada detectada. Forçando termos.');
-          await logout();
-          setLoginError('Conta reativada! Por favor, faça login novamente e aceite os termos de uso.');
           setIsLoginOpen(true);
           return;
         }
@@ -1029,8 +1026,12 @@ useEffect(() => {
         profile={profile ? { id: profile.id, email: profile.email, name: profile.name, avatar: profile.avatar, created_at: profile.created_at, username: profile.username } : null}
         theme={theme}
         onUpdate={updateProfile}
-        onDeleteAccount={deleteAccount}
-      />
+        onDeleteAccount={async () => {
+          console.log('[Dashboard] Marcando conta como deletada recentemente no localStorage');
+          localStorage.setItem('registai_conta_deletada_reciente', 'true');
+          await deleteAccount();
+        }} // <-- Fecha a função E a propriedade aqui
+      /> // <-- Fecha a tag do componente aqui sozinho
 
       {/* Admin Panel */}
       {isAdmin && (
