@@ -16,7 +16,7 @@ import { ToolCard } from './ToolCard';
 import { LoginModal } from './LoginModal';
 import { ShareToolsModal } from './ShareToolsModal';
 import { TransferNotification } from './TransferNotification';
-import { useTools, isNativeCategory } from '@/hooks/useTools.fetch';
+import { useTools } from '@/hooks/useTools.fetch';
 import { useAuth } from '@/contexts/AuthContext';
 // supabase import removido — usando fetch direto para bypass RLS
 import {
@@ -84,7 +84,7 @@ export function Dashboard() {
     refreshTools,
   } = useTools();
   
-  const { currentUser, theme, isAdmin, profile, updateProfile, deleteAccount, blockMessage } = useAuth();
+  const { currentUser, theme, isAdmin, profile, updateProfile, deleteAccount, blockMessage, needsOnboarding, dismissOnboarding } = useAuth();
   
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -122,13 +122,13 @@ export function Dashboard() {
         const rawBlocked = profileData?.is_blocked;
         const isBlocked = rawBlocked === true || rawBlocked === 'true' || rawBlocked === 1 || rawBlocked === 't';
         if (isBlocked) {
-          console.log('[Dashboard] [verifyUser] Usuario BLOQUEADO detectado, fazendo signOut:', currentUser.email);
+          console.log('[Dashboard] [verifyUser] 🚫 Usuario BLOQUEADO detectado, fazendo signOut:', currentUser.email);
           await logout();
           setLoginError('Sua conta foi suspensa. Entre em contato com o suporte.');
           setIsLoginOpen(true);
           return;
         }
-        console.log('[Dashboard] [verifyUser] Usuario OK:', currentUser.email);
+        console.log('[Dashboard] [verifyUser] ✅ Usuario OK:', currentUser.email);
       } catch (e: any) {
         console.error('[Dashboard] [verifyUser] Erro:', e.message);
       }
@@ -167,7 +167,7 @@ export function Dashboard() {
   const [editCategoryName, setEditCategoryName] = useState('');
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
 
-    // Escutar evento de transferencia aceita -> refetch ferramentas
+  // Escutar evento de transferencia aceita -> refetch ferramentas
   // CORRECAO: useRef garante que sempre chamamos a versao MAIS RECENTE de refreshTools
   // sem recriar o listener a cada render (evita referencia stale)
   const refreshToolsRef = useRef(refreshTools);
@@ -182,13 +182,13 @@ export function Dashboard() {
     return () => window.removeEventListener('tools-changed', handleToolsChanged);
   }, []); // [] = listener criado uma vez so, nunca recriado
 
-  // Detectar erro de auth (bloqueio/deleted) apos redirect do Google — VERIFICA NA MONTAGEM
+  // Detectar erro de auth (bloqueio/deleted) após redirect do Google — VERIFICA NA MONTAGEM
   useEffect(() => {
     const raw = localStorage.getItem('auth_error');
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        // So usa se for recente (< 30 segundos)
+        // Só usa se for recente (< 30 segundos)
         if (Date.now() - parsed.ts < 30000) {
           setLoginError(parsed.msg);
           setIsLoginOpen(true);
@@ -265,7 +265,7 @@ export function Dashboard() {
       
       setNewToolData({
         name: name,
-        description: `Ferramenta de IA acessivel em ${url.hostname}`,
+        description: `Ferramenta de IA acessível em ${url.hostname}`,
         url: autoGenUrl,
         category: categories[0]?.id || 'Chatbots',
         image_url: `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=128`,
@@ -273,7 +273,7 @@ export function Dashboard() {
       // Mostrar aviso sobre campos que precisam ser personalizados
       setShowScrapeWarning(true);
     } catch {
-      // URL invalida
+      // URL inválida
     }
   };
 
@@ -288,8 +288,6 @@ export function Dashboard() {
     console.log('[Dashboard] addCategory resultado:', result);
     if (result.success) {
       setNewCategoryName('');
-    } else {
-      alert(result.message);
     }
   };
 
@@ -301,8 +299,6 @@ export function Dashboard() {
     if (result.success) {
       setEditingCategory(null);
       setEditCategoryName('');
-    } else {
-      alert(result.message);
     }
   };
 
@@ -323,14 +319,11 @@ export function Dashboard() {
     console.log('[Dashboard] deleteCategory resultado:', result);
     if (result.success) {
       setCategoryToDelete(null);
-    } else {
-      alert(result.message);
-      setCategoryToDelete(null);
     }
   };
 
-  // ======= PROTECAO DE ROTA =======
-  // Se nao estiver autenticado, mostra APENAS a tela de login
+  // ======= PROTEÇÃO DE ROTA =======
+  // Se não estiver autenticado, mostra APENAS a tela de login
   if (!currentUser) {
     // ============================================================
     // DETECTAR REDIRECT DO OAUTH: se URL tem token, estamos em
@@ -363,10 +356,10 @@ export function Dashboard() {
               registAI
             </h1>
             <p className={`mt-2 text-base ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>
-              Catalogo Inteligente de IA
+              Catálogo Inteligente de IA
             </p>
             <p className={`mt-4 text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-gray-400'}`}>
-              Faca login para acessar suas ferramentas e o assistente Regis
+              Faça login para acessar suas ferramentas e o assistente Regis
             </p>
           </div>
           {blockMessage && (
@@ -393,6 +386,75 @@ export function Dashboard() {
 
   return (
     <div className={`min-h-screen flex flex-col ${theme === 'dark' ? 'bg-slate-950' : 'bg-gray-50'}`}>
+      {/* ====== ONBOARDING MODAL — bloqueia interface até aceitar termos ====== */}
+      {needsOnboarding && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className={`w-full max-w-lg rounded-2xl border shadow-2xl p-8 ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'}`}>
+            {/* Logo */}
+            <div className="flex justify-center mb-6">
+              <svg width="64" height="64" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M20 2L36 11V29L20 38L4 29V11L20 2Z" stroke="#8b5cf6" strokeWidth="2" fill="none"/>
+                <path d="M12 16H28" stroke="#8b5cf6" strokeWidth="1.5" strokeLinecap="round" />
+                <rect x="12" y="20" width="5" height="5" rx="1" fill="#8b5cf6" opacity="0.9"/>
+                <rect x="17.5" y="20" width="5" height="5" rx="1" fill="#a78bfa" opacity="0.9"/>
+                <rect x="23" y="20" width="5" height="5" rx="1" fill="#c4b5fd" opacity="0.9"/>
+                <circle cx="20" cy="13" r="2.5" fill="#06b6d4"/>
+              </svg>
+            </div>
+
+            <h2 className={`text-2xl font-bold text-center mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              Bem-vindo ao registAI!
+            </h2>
+            <p className={`text-center text-sm mb-6 ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>
+              Sua conta foi criada com sucesso via Google.
+            </p>
+
+            {/* Termos */}
+            <div className={`rounded-xl border p-5 mb-6 max-h-64 overflow-y-auto ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-gray-50 border-gray-200'}`}>
+              <h3 className={`text-sm font-semibold mb-3 ${theme === 'dark' ? 'text-slate-200' : 'text-gray-800'}`}>
+                Termos de Uso da Plataforma
+              </h3>
+              <div className={`space-y-3 text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-gray-600'}`}>
+                <p>
+                  <strong className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>1. Aceitação dos Termos</strong><br/>
+                  Ao utilizar o registAI, você concorda com estes termos de uso. A plataforma é um catálogo de ferramentas de inteligência artificial destinado a fins informativos e organizacionais.
+                </p>
+                <p>
+                  <strong className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>2. Responsabilidade do Usuário</strong><br/>
+                  Você é responsável por todas as ações realizadas em sua conta. Mantenha suas credenciais de acesso seguras e não as compartilhe com terceiros.
+                </p>
+                <p>
+                  <strong className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>3. Conteúdo e Ferramentas</strong><br/>
+                  As ferramentas listadas no catálogo são de responsabilidade de seus respectivos desenvolvedores. O registAI não se responsabiliza pelo funcionamento, precisão ou segurança das ferramentas de terceiros.
+                </p>
+                <p>
+                  <strong className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>4. Privacidade de Dados</strong><br/>
+                  Respeitamos sua privacidade. Seus dados pessoais são armazenados de forma segura e utilizados apenas para o funcionamento da plataforma. Não vendemos nem compartilhamos seus dados com terceiros para fins comerciais.
+                </p>
+                <p>
+                  <strong className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>5. Modificações e Cancelamento</strong><br/>
+                  Reservamo-nos o direito de modificar ou descontinuar qualquer parte do serviço a qualquer momento. Você pode excluir sua conta a qualquer momento através do painel de perfil.
+                </p>
+              </div>
+            </div>
+
+            {/* Checkbox simulado + Botão */}
+            <div className="space-y-4">
+              <p className={`text-xs text-center ${theme === 'dark' ? 'text-slate-500' : 'text-gray-500'}`}>
+                Ao clicar em "Aceitar e Continuar", você confirma que leu e concorda com os termos acima.
+              </p>
+              <Button
+                onClick={dismissOnboarding}
+                className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white py-6 text-base rounded-xl shadow-lg shadow-violet-500/25"
+              >
+                <Sparkles className="w-5 h-5 mr-2" />
+                Aceitar e Continuar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Header onLogin={() => setIsLoginOpen(true)} onProfile={() => setShowProfile(true)} onAdmin={() => setShowAdmin(true)} />
       
       {/* News Carousel */}
@@ -426,7 +488,7 @@ export function Dashboard() {
             onReset={resetClicks}
           />
 
-          {/* Orcamento - velocimetros */}
+          {/* Orçamento - velocímetros */}
           <BudgetGauges
             subscriptions={subscriptions}
             budget={budget}
@@ -491,7 +553,7 @@ export function Dashboard() {
             <TransferNotification theme={theme} currentUser={currentUser} />
           )}
 
-          {/* Loading Guard — impede renderizacao prematura */}
+          {/* Loading Guard — impede renderização prematura */}
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
@@ -564,7 +626,7 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* Tools Grid/List */}
+                        {/* Tools Grid/List */}
           <div className="flex-1 overflow-y-auto p-6">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center h-full">
@@ -640,7 +702,7 @@ export function Dashboard() {
               Nova Ferramenta
             </DialogTitle>
             <DialogDescription className={theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}>
-              Adicione uma nova ferramenta ao catalogo.
+              Adicione uma nova ferramenta ao catálogo.
             </DialogDescription>
           </DialogHeader>
           
@@ -670,9 +732,9 @@ export function Dashboard() {
             }`}>
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-xs font-semibold">Atencao</p>
+                <p className="text-xs font-semibold">Atenção</p>
                 <p className="text-[11px] mt-0.5">
-                  Ao selecionar a opcao de Puxar dados via URL os campos sao preenchidos automaticamente, porem, nos campos de <strong>Descricao</strong> e <strong>Categoria</strong> e recomendado alterar a descricao e selecionar a categoria desejada.
+                  Ao selecionar a opção de Puxar dados via URL os campos são preenchidos automaticamente, porém, nos campos de <strong>Descrição</strong> e <strong>Categoria</strong> é recomendado alterar a descrição e selecionar a categoria desejada.
                 </p>
               </div>
             </div>
@@ -689,11 +751,11 @@ export function Dashboard() {
               />
             </div>
             <div>
-              <Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Descricao</Label>
+              <Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Descrição</Label>
               <Textarea
                 value={newToolData.description}
                 onChange={(e) => setNewToolData({ ...newToolData, description: e.target.value })}
-                placeholder="Descricao da ferramenta"
+                placeholder="Descrição da ferramenta"
                 className={theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : ''}
               />
             </div>
@@ -759,7 +821,7 @@ export function Dashboard() {
               Gerenciar Categorias
             </DialogTitle>
             <DialogDescription className={theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}>
-              Adicione, edite ou remova novas categorias de ferramentas.
+              Adicione, edite ou remova categorias de ferramentas.
             </DialogDescription>
           </DialogHeader>
 
@@ -784,84 +846,72 @@ export function Dashboard() {
             {/* Categories List */}
             <div className="space-y-2 max-h-64 overflow-y-auto">
               <Label className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>Categorias Existentes</Label>
-              {categories.map((cat) => {
-                const native = isNativeCategory(cat.id);
-                return (
-                  <div
-                    key={cat.id}
-                    className={`flex items-center justify-between p-3 rounded-lg ${theme === 'dark' ? 'bg-slate-800' : 'bg-gray-50'}`}
-                  >
-                    {editingCategory === cat.id ? (
-                      <div className="flex items-center gap-2 flex-1">
-                        <Input
-                          value={editCategoryName}
-                          onChange={(e) => setEditCategoryName(e.target.value)}
-                          className={`flex-1 ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : ''}`}
-                          autoFocus
-                        />
-                        <Button
-                          size="sm"
-                          onClick={handleEditCategorySave}
-                          className="bg-violet-600 hover:bg-violet-700"
-                        >
-                          Salvar
-                        </Button>
+              {categories.map((cat) => (
+                <div 
+                  key={cat.id} 
+                  className={`flex items-center justify-between p-3 rounded-lg ${theme === 'dark' ? 'bg-slate-800' : 'bg-gray-50'}`}
+                >
+                  {editingCategory === cat.id ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <Input
+                        value={editCategoryName}
+                        onChange={(e) => setEditCategoryName(e.target.value)}
+                        className={`flex-1 ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : ''}`}
+                        autoFocus
+                      />
+                      <Button 
+                        size="sm" 
+                        onClick={handleEditCategorySave}
+                        className="bg-violet-600 hover:bg-violet-700"
+                      >
+                        Salvar
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => {
+                          setEditingCategory(null);
+                          setEditCategoryName('');
+                        }}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                          {cat.name}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-gray-200 text-gray-500'}`}>
+                          {categoryCounts[cat.id] || 0} ferramentas
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => {
-                            setEditingCategory(null);
-                            setEditCategoryName('');
+                            setEditingCategory(cat.id);
+                            setEditCategoryName(cat.name);
                           }}
+                          className={theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}
                         >
-                          <X className="w-4 h-4" />
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setCategoryToDelete(cat.id)}
+                          className="text-red-500 hover:text-red-600"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-3">
-                          <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                            {cat.name}
-                          </span>
-                          {native && (
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${theme === 'dark' ? 'bg-amber-900/30 text-amber-400 border border-amber-800/50' : 'bg-amber-100 text-amber-700 border border-amber-300'}`}>
-                              Nativa
-                            </span>
-                          )}
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-gray-200 text-gray-500'}`}>
-                            {categoryCounts[cat.id] || 0} ferramentas
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {!native && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setEditingCategory(cat.id);
-                                  setEditCategoryName(cat.name);
-                                }}
-                                className={theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setCategoryToDelete(cat.id)}
-                                className="text-red-500 hover:text-red-600"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
+                    </>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </DialogContent>
@@ -872,10 +922,10 @@ export function Dashboard() {
         <AlertDialogContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}>
           <AlertDialogHeader>
             <AlertDialogTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-              Confirmar exclusao
+              Confirmar exclusão
             </AlertDialogTitle>
             <AlertDialogDescription className={theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}>
-              Tem certeza que deseja excluir esta categoria? As ferramentas associadas nao serao excluidas, mas ficarao sem categoria.
+              Tem certeza que deseja excluir esta categoria? As ferramentas associadas não serão excluídas, mas ficarão sem categoria.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -898,7 +948,7 @@ export function Dashboard() {
         <DialogContent className={`max-w-sm ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}`}>
           <DialogHeader>
             <DialogTitle className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-              Definir Orcamento
+              Definir Orçamento
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 pt-2">
