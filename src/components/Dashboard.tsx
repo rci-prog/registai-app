@@ -132,7 +132,7 @@ useEffect(() => {
         const profileData = data?.[0];
         console.log('[Dashboard] [verifyUser] Resultado:', currentUser.email, 'is_blocked:', profileData?.is_blocked, 'existe:', !!profileData);
         
-      // --- TRAVA DE REATIVAÇÃO BLINDADA (VIA COOKIE) ---
+      // --- TRAVA DE REATIVAÇÃO BLINDADA (LIMPEZA AGRESSIVA) ---
 const getCookie = (name) => {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
@@ -142,14 +142,17 @@ const getCookie = (name) => {
 const reativacaoPendente = getCookie('reativacao_pendente') === 'true';
 
 if (reativacaoPendente) {
-  console.log('[Dashboard] [verifyUser] 🚨 Reativação detectada via COOKIE! Aplicando logout.');
-  
-  // Remove o cookie forçadamente para todos os caminhos
+  console.log('[Dashboard] [verifyUser] 🚨 Reativação detectada! Limpando cookies e deslogando.');
+
+  // MÉTODOS DE LIMPEZA EM TODAS AS VARIAÇÕES POSSÍVEIS
+  const domain = window.location.hostname;
+  // Tenta apagar com e sem o domínio, com e sem path
   document.cookie = "reativacao_pendente=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-  document.cookie = "reativacao_pendente=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/dashboard;"; // caso o path seja diferente
+  document.cookie = "reativacao_pendente=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + domain;
+  document.cookie = "reativacao_pendente=; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
   
   await logout();
-  setLoginError('Conta reativada! Faça login novamente para aceitar os termos.');
+  setLoginError('Conta reativada! Por favor, faça login novamente para aceitar os termos.');
   setIsLoginOpen(true);
   return;
 }
