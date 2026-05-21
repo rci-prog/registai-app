@@ -100,6 +100,17 @@ export function Dashboard() {
       if (!currentUser?.id) return;
       console.log('[Dashboard] [verifyUser] Verificando usuario:', currentUser.email);
       try {
+        // 1. Pegamos a sessão direto do Supabase para checar o status real do e-mail
+        const { data: { session } } = await supabase.auth.getSession();
+        const isEmailConfirmed = !!session?.user?.email_confirmed_at;
+
+        // Se o e-mail NÃO está confirmado, ele é um usuário pendente de verificação.
+        // Não podemos tratá-lo como "deletado"!
+        if (session?.user && !isEmailConfirmed) {
+          console.log('[Dashboard] [verifyUser] ⏳ Usuário com e-mail pendente de confirmação. Ignorando checagem de exclusão.');
+          return;
+        }
+
         // Fetch direto = bypass RLS, le o valor REAL do is_blocked
         const resp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,is_blocked&id=eq.${currentUser.id}`, {
           method: 'GET',
@@ -112,6 +123,7 @@ export function Dashboard() {
         const data = await resp.json();
         const profileData = data?.[0];
         console.log('[Dashboard] [verifyUser] Resultado:', currentUser.email, 'is_blocked:', profileData?.is_blocked, 'existe:', !!profileData);
+        
         if (!profileData) {
           console.log('[Dashboard] [verifyUser] Usuario deletado detectado, fazendo signOut');
           await logout();
@@ -119,6 +131,7 @@ export function Dashboard() {
           setIsLoginOpen(true);
           return;
         }
+        
         const rawBlocked = profileData?.is_blocked;
         const isBlocked = rawBlocked === true || rawBlocked === 'true' || rawBlocked === 1 || rawBlocked === 't';
         if (isBlocked) {
@@ -145,7 +158,6 @@ export function Dashboard() {
     window.addEventListener('open-login-modal', handler);
     return () => window.removeEventListener('open-login-modal', handler);
   }, []);
-
   const [showAdmin, setShowAdmin] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
