@@ -133,15 +133,19 @@ useEffect(() => {
         console.log('[Dashboard] [verifyUser] Resultado:', currentUser.email, 'is_blocked:', profileData?.is_blocked, 'existe:', !!profileData);
         
       // --- TRAVA DE REATIVAÇÃO COMPLEMENTAR (URL + SESSIONSTORAGE) ---
-        const urlParams = new URLSearchParams(window.location.search);
-        const veioDaReativacao = urlParams.get('reactive') === 'true' || sessionStorage.getItem('registai_conta_deletada_reciente') === 'true';
+        const veioDaReativacao = sessionStorage.getItem('registai_conta_deletada_reciente') === 'true';
 
         if (veioDaReativacao) {
-          console.log('[Dashboard] [verifyUser] 🚨 Reativação recente detectada!');
+          console.log('[Dashboard] [verifyUser] 🚨 Reativação recente detectada! Cortando o loop.');
           
-          // Limpa os rastros para o próximo login funcionar normalmente
+          // Removemos da sessão IMEDIATAMENTE antes de qualquer outra ação
           sessionStorage.removeItem('registai_conta_deletada_reciente');
-          window.history.replaceState({}, document.title, window.location.pathname);
+          
+          // Limpa completamente qualquer query param que tenha vindo na URL real
+          if (window.location.search.includes('reactive=true')) {
+            const novaUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+            window.history.replaceState({ path: novaUrl }, '', novaUrl);
+          }
           
           await logout();
           setLoginError('Conta reativada com sucesso! Por favor, faça login novamente para aceitar os termos de uso.');
