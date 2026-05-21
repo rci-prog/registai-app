@@ -133,29 +133,24 @@ useEffect(() => {
         console.log('[Dashboard] [verifyUser] Resultado:', currentUser.email, 'is_blocked:', profileData?.is_blocked, 'existe:', !!profileData);
         
       // --- TRAVA DE REATIVAÇÃO COMPLEMENTAR (URL + SESSIONSTORAGE) ---
-        const urlParams = new URLSearchParams(window.location.search);
-        const temParametroUrl = urlParams.get('reactive') === 'true';
-        const jaBarrouNestaSessao = sessionStorage.getItem('bloqueio_reativacao_executado') === 'true';
+        const getCookie = (name: string) => {
+          const value = `; ${document.cookie}`;
+          const parts = value.split(`; ${name}=`);
+          if (parts.length === 2) return parts.pop()?.split(';').shift();
+        };
 
-        if (temParametroUrl && !jaBarrouNestaSessao) {
-          console.log('[Dashboard] [verifyUser] 🚨 Reativação detectada via URL! Aplicando logout de segurança.');
+        const reativacaoPendente = getCookie('reativacao_pendente') === 'true';
+
+        if (reativacaoPendente) {
+          console.log('[Dashboard] [verifyUser] 🚨 Reativação detectada via COOKIE! Aplicando logout.');
           
-          // Marca que já barrou uma vez para não entrar em loop no próximo re-render
-          sessionStorage.setItem('bloqueio_reativacao_executado', 'true');
-          
-          // Limpa a sujeira da URL do navegador
-          const novaUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-          window.history.replaceState({ path: novaUrl }, '', novaUrl);
+          // Expira o cookie imediatamente
+          document.cookie = "reativacao_pendente=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
           
           await logout();
-          setLoginError('Conta reativada com sucesso! Por favor, faça login novamente para aceitar os termos de uso.');
+          setLoginError('Conta reativada! Faça login novamente para aceitar os termos.');
           setIsLoginOpen(true);
           return;
-        }
-
-        // Se o usuário clicar no botão do Google de novo (URL já limpa), limpa a flag para futuros cadastros
-        if (!temParametroUrl && jaBarrouNestaSessao) {
-          sessionStorage.removeItem('bloqueio_reativacao_executado');
         }
         // -----------------------------------------------------------------
 
@@ -1041,8 +1036,8 @@ useEffect(() => {
         theme={theme}
         onUpdate={updateProfile}
         onDeleteAccount={async () => {
-          console.log('[Dashboard] Marcando conta como deletada recentemente no sessionStorage');
-          sessionStorage.setItem('registai_conta_deletada_reciente', 'true');
+          // Grava o cookie que expira em 1 hora (tempo mais que suficiente para o login)
+          document.cookie = "reativacao_pendente=true; max-age=3600; path=/";
           await deleteAccount();
         }}
       />
