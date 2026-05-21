@@ -101,9 +101,8 @@ useEffect(() => {
       console.log('[Dashboard] [verifyUser] Verificando usuario:', currentUser.email);
       try {
         // 1. Pegamos os dados da sessão guardados pelo próprio Supabase Auth no localStorage
-        // Isso evita precisar do objeto global 'supabase' e não quebra seu bypass de RLS
         const storageKey = Object.keys(localStorage).find(key => key.startsWith('sb-') && key.endsWith('-auth-token'));
-        let isEmailConfirmed = true; // Por padrão assume confirmado se não achar no storage
+        let isEmailConfirmed = true;
 
         if (storageKey) {
           try {
@@ -117,13 +116,12 @@ useEffect(() => {
         }
 
         // Se o e-mail NÃO está confirmado, ele é um usuário pendente de verificação.
-        // Não podemos tratá-lo como "deletado"!
         if (!isEmailConfirmed) {
           console.log('[Dashboard] [verifyUser] ⏳ Usuário com e-mail pendente de confirmação. Ignorando checagem de exclusão.');
           return;
         }
 
-        // MUDANÇA 1: Adicionado 'created_at' no select para tracking de reativação via Google
+        // Fetch direto = bypass RLS, trazendo também o created_at
         const resp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,is_blocked,created_at&id=eq.${currentUser.id}`, {
           method: 'GET',
           headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
@@ -144,24 +142,18 @@ useEffect(() => {
           return;
         }
 
-        // MUDANÇA 2: Trava inteligente apenas para contas Google recém-criadas/recriadas
+        // Trava inteligente apenas para contas Google recém-criadas/recriadas
         const createdAt = new Date(profileData.created_at).getTime();
         const agora = new Date().getTime();
         const diferencaSegundos = (agora - createdAt) / 1000;
-        
-        // Detecta se o provedor atual é o Google
         const provider = currentUser?.app_metadata?.provider || currentUser?.identities?.[0]?.provider;
 
         if (provider === 'google' && diferencaSegundos < 10) {
           console.log('[Dashboard] [verifyUser] 🆕 Conta Google recém-criada/recriada detectada. Forçando termos.');
-          
-          // ---- SEU MODAL DE TERMOS ENTRA AQUI ----
-          // Exemplo de comportamento se você quiser deslogar e avisar:
           await logout();
           setLoginError('Conta reativada! Por favor, faça login novamente e aceite os termos de uso.');
           setIsLoginOpen(true);
           return;
-          // ----------------------------------------
         }
         
         const rawBlocked = profileData?.is_blocked;
@@ -173,30 +165,15 @@ useEffect(() => {
           setIsLoginOpen(true);
           return;
         }
-        console.log('[Dashboard] [verifyUser] ✅ Usuario OK:', currentUser.email);
-      } catch (e: any) {
-        console.error('[Dashboard] [verifyUser] Erro:', e.message);
-      }
-    };
-    verifyUser();
-  }, [currentUser?.id]);
         
-        const rawBlocked = profileData?.is_blocked;
-        const isBlocked = rawBlocked === true || rawBlocked === 'true' || rawBlocked === 1 || rawBlocked === 't';
-        if (isBlocked) {
-          console.log('[Dashboard] [verifyUser] 🚫 Usuario BLOQUEADO detectado, fazendo signOut:', currentUser.email);
-          await logout();
-          setLoginError('Sua conta foi suspensa. Entre em contato com o suporte.');
-          setIsLoginOpen(true);
-          return;
-        }
         console.log('[Dashboard] [verifyUser] ✅ Usuario OK:', currentUser.email);
       } catch (e: any) {
         console.error('[Dashboard] [verifyUser] Erro:', e.message);
       }
-    };
+    }; // <-- Fecha a função verifyUser de verdade aqui
+
     verifyUser();
-  }, [currentUser?.id]); // executa quando currentUser ficar disponivel
+  }, [currentUser?.id]); // <-- Só um useEffect fechando aqui embaixo!
   // Escuta evento para abrir modal de login (apos redefinicao de senha)
   useEffect(() => {
     const handler = () => {
