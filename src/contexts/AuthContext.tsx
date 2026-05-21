@@ -353,20 +353,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Profile NÃO existe → CONTA DELETADA detectada
-        console.log('[Auth] [register] 3b.2. CONTA DELETADA detectada — tentando reativar...');
+        console.log('[Auth] [register] 3b.2. CONTA DELETADA — tentando signIn com a senha digitada...');
 
         const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
 
         if (loginError || !loginData?.user) {
-          console.log('[Auth] [register] 3b.3. Login falhou:', loginError?.message);
+          console.log('[Auth] [register] 3b.3. signIn falhou (senha diferente da antiga):', loginError?.message);
           return {
             success: false,
-            message: 'Este e-mail já foi usado anteriormente e a conta foi encerrada. Para reativar, digite a mesma senha que usava. Se esqueceu a senha, use "Esqueci a senha" na tela de login.',
+            message: 'Uma conta anterior foi encontrada com este e-mail. Para reativa-la, digite a senha que usava antes de encerrar a conta. Se nao lembra, clique em "Esqueci a senha".',
           };
         }
 
-        // Login OK → reativar profile via UPSERT
-        console.log('[Auth] [register] 3b.4. Login OK — reativando profile...');
+        // signIn OK → reativar profile via UPSERT
+        console.log('[Auth] [register] 3b.4. signIn OK — reativando profile...');
         const isAdminUser = email === ADMIN_EMAIL;
         const reactivatedProfile = {
           id: loginData.user.id,
@@ -441,15 +441,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
 
           if (loginError || !loginData?.user) {
-            console.log('[Auth] [register] 3c.3. Login falhou:', loginError?.message);
+            console.log('[Auth] [register] 3c.3. signIn falhou (senha diferente da antiga):', loginError?.message);
             return {
               success: false,
-              message: 'Este e-mail já foi usado anteriormente e a conta foi encerrada. Para reativar, digite a mesma senha que usava. Se esqueceu a senha, use "Esqueci a senha" na tela de login.',
+              message: 'Uma conta anterior foi encontrada com este e-mail. Para reativa-la, digite a senha que usava antes de encerrar a conta. Se nao lembra, clique em "Esqueci a senha".',
             };
           }
 
-          // Login OK → reativar
-          console.log('[Auth] [register] 3c.4. Login OK — reativando...');
+          // signIn OK → reativar
+          console.log('[Auth] [register] 3c.4. signIn OK — reativando...');
           const isAdminUser = email === ADMIN_EMAIL;
           const reactivatedProfile = {
             id: loginData.user.id,
@@ -578,10 +578,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updatePassword = useCallback(async (_currentPassword: string, newPassword: string) => {
     const { data: sessionData } = await supabase.auth.getSession();
     const recoveryEmail = sessionData?.session?.user?.email || '';
-    
+
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return { success: false, message: error.message };
-    
+
     // Se profile nao existe (conta deletada em recovery), reativar via upsert
     if (recoveryEmail) {
       const { data: profileCheck } = await supabase.from('profiles').select('id').eq('email', recoveryEmail).maybeSingle();
@@ -605,7 +605,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[Auth] [updatePassword] ✅ Profile reativado apos recovery');
       }
     }
-    
+
     return { success: true, message: 'Senha atualizada!' };
   }, []);
   const updateTheme = useCallback((_newTheme: 'light' | 'dark') => {
@@ -752,11 +752,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[Auth] [onAuthStateChange]', event, session?.user?.email || 'no user');
 
       if (event === 'PASSWORD_RECOVERY') {
-        console.log('[Auth] [onAuthStateChange] 🔒 PASSWORD_RECOVERY — ignorando');
+        console.log('[Auth] [onAuthStateChange] 🔒 PASSWORD_RECOVERY — flag ativada');
         return;
       }
 
-            if (event === 'SIGNED_IN' && session?.user) {
+      if (event === 'SIGNED_IN' && session?.user) {
         // Se estamos em sessao de recovery (apos clicar no link do e-mail),
         // NUNCA verificar profile nem dar signOut — deixar o usuario trocar a senha
         const isRecoveryFlow = new URLSearchParams(window.location.search).get('reset_password') === 'true';
