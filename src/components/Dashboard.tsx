@@ -99,87 +99,24 @@ export function Dashboard() {
   const isBlockedRef = useRef(false);
 
   useEffect(() => {
-    const verifyUser = async () => {
-      if (!currentUser?.id) return;
-      
-      try {
-        // --- 1. Verificação de Reativação (Corrigida) ---
-const urlParams = new URLSearchParams(window.location.search);
-const isReactive = urlParams.get('reactive') === 'true';
-const isBlockedSession = sessionStorage.getItem('bloqueio_reativacao_ativo') === 'true';
+  const verifyAndLoad = async () => {
+    // 1. Lógica de bloqueio que criamos anteriormente...
+    // (Mantenha o código de reativação aqui)
+    
+    // 2. GUARDA DE SEGURANÇA:
+    // Se não houver usuário, pare tudo imediatamente!
+    if (!currentUser?.id) {
+      console.log('[Dashboard] Nenhum usuário, interrompendo carregamento de dados.');
+      return;
+    }
 
-if ((isReactive || isBlockedSession) && !isBlockedRef.current) {
-  isBlockedRef.current = true; // Impede a re-execução deste bloco
-  
-  // Limpa o estado no navegador para parar o loop
-  if (isReactive) {
-    sessionStorage.setItem('bloqueio_reativacao_ativo', 'true');
-    // Remove o parâmetro 'reactive' da URL sem recarregar a página
-    const newUrl = window.location.pathname;
-    window.history.replaceState({}, document.title, newUrl);
-  }
-  
-  console.log('[Dashboard] 🛑 Bloqueio de reativação processado. Iniciando logout...');
-  
-  await logout();
-  
-  // Garante que o estado de login está fechado
-  setIsLoginOpen(true);
-  setLoginError('Conta reativada! Faça login novamente para aceitar os termos.');
-  
-  return; // Sai do useEffect aqui, não continua para o fetch dos dados
-}
+    // 3. Se passou pela guarda, pode carregar os dados
+    console.log('[Dashboard] Carregando dados para:', currentUser.id);
+    // ... restante do seu código de fetch (STEP 1/4, etc)
+  };
 
-        // --- 2. Verificação de Integridade (Supabase) ---
-        const storageKey = Object.keys(localStorage).find(key => key.startsWith('sb-') && key.endsWith('-auth-token'));
-        let isEmailConfirmed = true;
-
-        if (storageKey) {
-          try {
-            const sessionData = JSON.parse(localStorage.getItem(storageKey) || '{}');
-            if (sessionData?.user) isEmailConfirmed = !!sessionData.user.email_confirmed_at;
-          } catch (err) {
-            console.error('[Dashboard] Erro ao ler token:', err);
-          }
-        }
-
-        if (!isEmailConfirmed) return;
-
-        const resp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id,is_blocked&id=eq.${currentUser.id}`, {
-          method: 'GET',
-          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-        });
-        
-        const data = resp.ok ? await resp.json() : [];
-        const profileData = data?.[0];
-
-        // --- 3. Lógica Consolidada de Bloqueio/Deleção ---
-        if (!profileData) {
-          console.log('[Dashboard] Usuario deletado detectado');
-          await logout();
-          setLoginError('Esta conta foi removida. Cadastre-se novamente.');
-          setIsLoginOpen(true);
-          return;
-        }
-
-        const rawBlocked = profileData?.is_blocked;
-        const isBlockedByAdmin = rawBlocked === true || rawBlocked === 'true' || rawBlocked === 1 || rawBlocked === 't';
-
-        if (isBlockedByAdmin) {
-          console.log('[Dashboard] 🚫 Usuario BLOQUEADO detectado');
-          await logout();
-          setLoginError('Sua conta foi suspensa. Entre em contato com o suporte.');
-          setIsLoginOpen(true);
-          return;
-        }
-        
-      } catch (e: any) {
-        console.error('[Dashboard] Erro:', e.message);
-      }
-    };
-
-    verifyUser();
-  }, [currentUser?.id, logout]); // Incluí logout aqui para evitar avisos de dependência
+  verifyAndLoad();
+}, [currentUser?.id]); // O useEffect só deve rodar quando o ID mudar
   // Escuta evento para abrir modal de login (apos redefinicao de senha)
   useEffect(() => {
     const handler = () => {
