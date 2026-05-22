@@ -336,25 +336,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
   
   // DELETE ACCOUNT
+    // DELETE ACCOUNT — via RPC que deleta auth.users + profiles no PostgreSQL
   const deleteAccount = useCallback(async (): Promise<{ success: boolean; message: string }> => {
     const userId = currentUserRef.current?.id;
-    if (!userId) return { success: false, message: 'Usuario nao identificado' };
+    if (!userId) return { success: false, message: 'Usuário não identificado' };
     try {
-      console.log('[Auth] [deleteAccount] Deletando dados do usuario:', userId);
-      const tables = ['user_tools', 'user_budgets', 'user_subscriptions', 'projects', 'tool_clicks'];
-      for (const table of tables) {
-        const { error } = await supabase.from(table).delete().eq('user_id', userId);
-        if (error) console.warn(`[deleteAccount] Falha ${table}:`, error.message);
+      console.log('[Auth] [deleteAccount] Chamando RPC delete_user_account para:', userId);
+
+      const { error: rpcError } = await supabase.rpc('delete_user_account', {
+        user_id: userId,
+      });
+
+      if (rpcError) {
+        console.error('[Auth] [deleteAccount] Erro no RPC:', rpcError.message);
+        return { success: false, message: 'Erro ao excluir conta: ' + rpcError.message };
       }
-      await supabase.from('tool_transfers').delete().eq('sender_id', userId);
-      await supabase.from('tool_transfers').delete().eq('recipient_id', userId);
-      await supabase.from('profiles').delete().eq('id', userId);
+
+      console.log('[Auth] [deleteAccount] ✅ RPC executado — limpando sessão...');
+
       await supabase.auth.signOut();
       clearAuth();
       setCurrentUser(null);
       setProfile(null);
-      console.log('[Auth] [deleteAccount] ✅ Conta excluida');
-      return { success: true, message: 'Conta excluida. Voce pode se cadastrar novamente.' };
+
+      // Redirecionar para a página inicial
+      window.location.href = '/';
+
+      return { success: true, message: 'Conta excluída com sucesso.' };
     } catch (error: any) {
       console.error('[Auth] [deleteAccount] Erro:', error.message);
       return { success: false, message: error.message };
