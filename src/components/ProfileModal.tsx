@@ -80,13 +80,13 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
     setSaveSuccess(null);
 
     try {
+      // CORREÇÃO: Caminho direto no storage para garantir consistência
       const fileExt = file.name.split('.').pop() || 'jpg';
-      const fileName = `${profile.id}-${Date.now()}.${fileExt}`;
-      const filePath = `public/${fileName}`;
+      const filePath = `${profile.id}/avatar.${fileExt}`;
+      
       console.log('[Profile] Caminho do upload:', filePath);
 
       // 1. Upload para o bucket 'avatars'
-      console.log('[Profile] Enviando para supabase.storage.from("avatars").upload()...');
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file, { upsert: true, contentType: file.type });
@@ -95,29 +95,16 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
         console.error('[Profile] ❌ Erro no upload:', uploadError.name, '-', uploadError.message);
         throw new Error(`Falha no upload [${uploadError.name}]: ${uploadError.message}`);
       }
-      console.log('[Profile] ✅ Upload bem-sucedido:', uploadData?.path || filePath);
 
-      // 2. Obter URL pública
-      console.log('[Profile] Obtendo URL pública...');
-      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      const publicUrl = urlData?.publicUrl;
-      console.log('[Profile] URL pública bruta:', publicUrl);
-
-      if (!publicUrl) {
-        throw new Error('Não foi possível obter a URL da imagem.');
-      }
-
-      const urlWithTimestamp = `${publicUrl}?t=${Date.now()}`;
-      console.log('[Profile] URL com timestamp:', urlWithTimestamp);
+      // 2. Obter URL pública corrigida
+      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      const publicUrl = `${data.publicUrl}?t=${Date.now()}`;
 
       // 3. Atualizar estado local
-      setAvatarUrl(urlWithTimestamp);
-      console.log('[Profile] Estado local atualizado');
+      setAvatarUrl(publicUrl);
 
-      // 4. Persistir no profile do Supabase
-      console.log('[Profile] Chamando onUpdate({ avatar: url })...');
-      await onUpdate({ avatar: urlWithTimestamp });
-      console.log('[Profile] ✅ onUpdate concluído');
+      // 4. Persistir no banco de dados
+      await onUpdate({ avatar: publicUrl });
 
       setSaveSuccess('Foto de perfil atualizada!');
     } catch (err: any) {
@@ -143,18 +130,15 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
         return;
       }
 
-      console.log('[Profile] Salvando perfil:', { full_name: trimmedName, username: username.trim() });
       await onUpdate({
         full_name: trimmedName,
         username: username.trim(),
         avatar: avatarUrl,
       });
-      console.log('[Profile] ✅ Perfil salvo com sucesso');
 
       setSaveSuccess('Perfil salvo com sucesso!');
     } catch (err: any) {
-      console.error('[Profile] ❌ Erro ao salvar:', err.message);
-      setSaveError(err.message || 'Erro ao salvar perfil. Tente novamente.');
+      setSaveError(err.message || 'Erro ao salvar perfil.');
     } finally {
       setIsSaving(false);
     }
@@ -199,7 +183,6 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
         </DialogHeader>
 
         <div className="space-y-4 pt-4">
-          {/* Avatar com upload clicável */}
           <div className="flex flex-col items-center gap-2">
             <div className="relative">
               <div className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold bg-violet-600 text-white overflow-hidden">
@@ -208,11 +191,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
                     src={avatarUrl}
                     alt={fullName}
                     className="w-full h-full object-cover"
-                    onError={(e) => {
-                      console.warn('[ProfileModal] img onError - URL falhou:', avatarUrl);
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                    onLoad={() => console.log('[ProfileModal] img onLoad - imagem carregada:', avatarUrl.substring(0, 60) + '...')}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
                 ) : (
                   (fullName || profile?.email || 'U').charAt(0).toUpperCase()
@@ -222,26 +201,14 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
                 className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-violet-600 hover:bg-violet-500 flex items-center justify-center shadow-lg transition-all hover:scale-110 disabled:opacity-50"
-                title="Trocar foto"
               >
-                {isUploading ? (
-                  <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
-                ) : (
-                  <Camera className="w-3.5 h-3.5 text-white" />
-                )}
+                {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
               </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
             </div>
             <p className="text-[11px] text-slate-500">Clique na câmera para trocar a foto</p>
           </div>
 
-          {/* Mensagens de erro / sucesso */}
           {saveError && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
               <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -255,39 +222,24 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
             </div>
           )}
 
-          {/* Nome Completo */}
           <div>
             <Label className="text-slate-300">Nome Completo</Label>
-            <Input
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Seu nome completo"
-              className="bg-slate-800 border-slate-700 text-white focus:ring-violet-500"
-            />
+            <Input value={fullName} onChange={(e) => setFullName(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
           </div>
 
-          {/* Username */}
           <div>
             <Label className="text-slate-300">Username</Label>
-            <Input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Seu username"
-              className="bg-slate-800 border-slate-700 text-white focus:ring-violet-500"
-            />
+            <Input value={username} onChange={(e) => setUsername(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
           </div>
 
-          {/* E-mail */}
           <div>
             <Label className="text-slate-300">E-mail</Label>
             <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-800 border border-slate-700/50">
               <Mail className="w-4 h-4 text-slate-500" />
               <span className="text-sm text-slate-400">{profile.email}</span>
             </div>
-            <p className="text-[10px] text-slate-500 mt-1">O e-mail não pode ser alterado.</p>
           </div>
 
-          {/* Membro desde */}
           <div>
             <Label className="text-slate-300">Membro desde</Label>
             <div className="text-sm px-3 py-2 rounded-lg bg-slate-800 border border-slate-700/50 text-slate-400">
@@ -295,76 +247,26 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
             </div>
           </div>
 
-          {/* Ações */}
           <div className="flex justify-between pt-4 gap-2">
-            <Button
-              variant="outline"
-              onClick={() => { setShowDeleteConfirm(true); setDeleteConfirmText(''); setDeleteError(null); }}
-              className="text-red-500 border-red-500/50 hover:bg-red-500/10 hover:text-red-600 bg-transparent"
-            >
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(true)} className="text-red-500 border-red-500/50 hover:bg-red-500/10">
               <Trash2 className="w-4 h-4 mr-2" /> Excluir conta
             </Button>
-            <Button
-              onClick={handleSave}
-              disabled={isSaving || isUploading}
-              className="bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50"
-            >
-              {isSaving ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4 mr-2" />
-              )}
+            <Button onClick={handleSave} disabled={isSaving || isUploading} className="bg-violet-600 hover:bg-violet-700">
               {isSaving ? 'Salvando...' : 'Salvar'}
             </Button>
           </div>
         </div>
 
-        {/* Confirmação de exclusão */}
         {showDeleteConfirm && (
-          <div className="mt-4 p-4 rounded-lg border border-red-800 bg-red-900/20 animate-in fade-in slide-in-from-top-2">
-            <div className="flex items-center gap-2 text-red-500 mb-2">
+          <div className="mt-4 p-4 rounded-lg border border-red-800 bg-red-900/20">
+             <div className="flex items-center gap-2 text-red-500 mb-2">
               <AlertTriangle className="w-5 h-5" />
               <span className="font-bold">Ação Irreversível</span>
             </div>
-            <p className="text-xs mb-3 text-slate-400">
-              Todos os seus dados, ferramentas favoritas e configurações serão removidos permanentemente.
-            </p>
-            <p className="text-xs mb-2 font-medium text-slate-300">
-              Digite <strong>excluir</strong> para confirmar:
-            </p>
-            <Input
-              type="text"
-              value={deleteConfirmText}
-              onChange={(e) => setDeleteConfirmText(e.target.value)}
-              placeholder="excluir"
-              className="bg-slate-800 border-slate-700 text-white text-sm mb-3"
-              onKeyDown={(e) => e.key === 'Enter' && handleDeleteAccount()}
-            />
-            {deleteError && (
-              <p className="text-xs text-red-400 mb-3">{deleteError}</p>
-            )}
+            <Input value={deleteConfirmText} onChange={(e) => setDeleteConfirmText(e.target.value)} placeholder="excluir" className="bg-slate-800 border-slate-700 text-white mb-3" />
             <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowDeleteConfirm(false)}
-                className="border-slate-700 text-white hover:bg-slate-800"
-              >
-                Cancelar
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleDeleteAccount}
-                disabled={isDeleting}
-                className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
-              >
-                {isDeleting ? (
-                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                ) : (
-                  <Trash2 className="w-3.5 h-3.5 mr-1" />
-                )}
-                {isDeleting ? 'Excluindo...' : 'Confirmar exclusão'}
-              </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowDeleteConfirm(false)}>Cancelar</Button>
+              <Button size="sm" onClick={handleDeleteAccount} className="bg-red-600">Confirmar</Button>
             </div>
           </div>
         )}
