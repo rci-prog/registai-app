@@ -121,33 +121,16 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     const result = await login(loginEmail, loginPassword);
     
     if (result.success) {
-      // Se for um fluxo OAuth (Google) que veio confirmado, fecha o modal direto 
-      // para o app seguir com a tela de aceite de termos
-      if (result.isOAuth) {
-        setIsLoginOpen(false);
-        return;
-      }
-
-      // Se for e-mail tradicional, exibe a mensagem e fecha após 5 segundos
-      setRegisterSuccess(true);
-      setRegisterMessage(result.message || 'Cadastro realizado! Verifique seu e-mail para confirmar a conta.');
-      
-      setRegisterName('');
-      setRegisterEmail('');
-      setRegisterPassword('');
-      setConfirmPassword('');
-
-      setTimeout(() => {
-        setIsLoginOpen(false);
-        setRegisterSuccess(false);
-      }, 5000);
-
-    } else {
-      setError(result.message);
+      setLoginEmail('');
+      setLoginPassword('');
+      setIsLoading(false);
+      onClose();
+      return;
     }
-
-    setIsLoading(false); // Garante que encerra o loading se der erro
-  }; // <-- ADICIONE ESSA CHAVE AQUI PARA FECHAR O HANDLELOGIN!
+    
+    setError(result.message);
+    setIsLoading(false);
+  };
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
@@ -160,12 +143,12 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     // Se sucesso, o navegador sera redirecionado pelo Supabase
   };
 
-    const handleRegister = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
     if (registerPassword !== confirmPassword) {
-      setError('As senhas não coincidem.');
+      setError('As senhas nao coincidem.');
       return;
     }
 
@@ -178,34 +161,19 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
     const result = await register(registerEmail, registerPassword, registerName);
     
     if (result.success) {
-      // Se for um fluxo OAuth (Google) que veio confirmado, fecha o modal direto 
-      // para o app seguir com a tela de aceite de termos
-      if (result.isOAuth) {
-        setIsLoginOpen(false);
-        setIsLoading(false); // Garante que desativa o loading antes de sair
-        return;
-      }
-
-      // Se for e-mail tradicional, exibe a mensagem e fecha após 5 segundos
       setRegisterSuccess(true);
       setRegisterMessage(result.message || 'Cadastro realizado! Verifique seu e-mail para confirmar a conta.');
-      
       setRegisterName('');
       setRegisterEmail('');
       setRegisterPassword('');
       setConfirmPassword('');
-
-      setTimeout(() => {
-        setIsLoginOpen(false);
-        setRegisterSuccess(false);
-      }, 5000);
-
-    } else {
-      setError(result.message);
+      setIsLoading(false);
+      return;
     }
     
+    setError(result.message);
     setIsLoading(false);
-  }; // <-- Essa era a chave que tinha ficado órfã ou faltando!
+  };
 
   const handleReactivateWithOTP = async () => {
     setError('');
