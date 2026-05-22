@@ -142,7 +142,6 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
   if (!profile) return null;
 
   const displayUrl = blobUrl || (avatarDataUrl && !avatarDataUrl.includes('supabase.co/storage') ? avatarDataUrl : '');
-  console.log('[Avatar] Render — blobUrl:', blobUrl ? 'SIM' : 'NÃO', '| avatarDataUrl:', avatarDataUrl ? (avatarDataUrl.substring(0, 30) + '...') : 'vazio', '| displayUrl:', displayUrl ? (displayUrl.substring(0, 30) + '...') : 'vazio');
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -157,7 +156,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
             <div className="relative">
               <div className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold bg-violet-600 text-white overflow-hidden">
                 {displayUrl ? (
-                  <img key={displayUrl} src={displayUrl} alt={fullName} className="w-full h-full object-cover" />
+                  <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url(${displayUrl})` }} />
                 ) : (fullName || profile?.email || 'U').charAt(0).toUpperCase()}
               </div>
               <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-violet-600 hover:bg-violet-500 flex items-center justify-center shadow-lg transition-all hover:scale-110 disabled:opacity-50">
