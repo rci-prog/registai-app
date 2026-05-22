@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogOut, Shield, User, UserPlus, Bell } from 'lucide-react';
+import { LogOut, User, UserPlus, Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import type { AppNotification } from '@/hooks/useNotifications';
@@ -7,7 +7,6 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { SupportModal } from '@/components/SupportModal';
 import { NotificationDetailModal } from '@/components/NotificationDetailModal';
 
 interface HeaderProps {
@@ -17,8 +16,7 @@ interface HeaderProps {
 }
 
 export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
-  const { currentUser, isAdmin, theme, logout } = useAuth();
-  const [supportOpen, setSupportOpen] = useState(false);
+  const { currentUser, theme, logout } = useAuth();
   const [notifOpen, setNotifOpen] = useState(false);
   const [detailNotif, setDetailNotif] = useState<AppNotification | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -70,20 +68,6 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
             <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Catalogo Inteligente de IA</p>
           </div>
         </div>
-
-        {/* CENTRO — Botao Painel ADM (apenas admin) */}
-        {isAdmin && (
-          <div className="absolute left-1/2 -translate-x-1/2 hidden sm:block">
-            <Button
-              size="sm"
-              onClick={onAdmin}
-              className="bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80 hover:from-violet-600 hover:to-fuchsia-600 text-white text-xs px-3 py-1 h-8 border border-violet-500/30"
-            >
-              <Shield className="w-3.5 h-3.5 mr-1.5" />
-              Painel ADM
-            </Button>
-          </div>
-        )}
 
         {/* Actions */}
         <div className="flex items-center gap-2">
@@ -191,16 +175,6 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
                     <User className="w-4 h-4 mr-2" />
                     Perfil
                   </DropdownMenuItem>
-                  {isAdmin && (
-                    <DropdownMenuItem onClick={onAdmin} className="cursor-pointer text-slate-300 focus:text-white focus:bg-slate-800">
-                      <Shield className="w-4 h-4 mr-2" />
-                      Painel Admin
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={() => setSupportOpen(true)} className="cursor-pointer text-slate-300 focus:text-white focus:bg-slate-800">
-                    <span className="text-xs mr-2">?</span>
-                    Suporte
-                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={logout} className="cursor-pointer text-red-400 focus:text-red-400 focus:bg-slate-800">
                     <LogOut className="w-4 h-4 mr-2" />
                     Sair
@@ -212,7 +186,6 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
         </div>
       </div>
 
-      <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
       <NotificationDetailModal
         open={detailOpen}
         onClose={() => { setDetailOpen(false); setDetailNotif(null); }}
