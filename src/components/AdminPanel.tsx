@@ -300,8 +300,10 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
       );
       setLocalUsers(localUsers.filter((u) => u.id !== deleteTarget.id));
       setAddAdminMsg('Usuario removido.');
+      setTimeout(() => setAddAdminMsg(null), 5000);
     } catch (e: any) {
       setErrorMsg('Erro ao excluir: ' + e.message);
+      setTimeout(() => setErrorMsg(null), 5000);
     }
     setDeleteTarget(null);
   };
