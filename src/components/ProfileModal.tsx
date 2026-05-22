@@ -30,6 +30,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
   const [fullName, setFullName] = useState(profile?.name || '');
   const [username, setUsername] = useState(profile?.username || '');
   const [avatarDataUrl, setAvatarDataUrl] = useState(profile?.avatar || '');
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -41,19 +42,25 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Só sincroniza quando o modal abre — NÃO quando o profile muda
-  // Isso evita que o useEffect sobrescreva o avatar base64 local
-  // após o onUpdate salvar no banco
+  // Só sincroniza quando o modal abre
   useEffect(() => {
     if (open && profile) {
       setFullName(profile.name || '');
       setUsername(profile.username || '');
       setAvatarDataUrl(profile.avatar || '');
+      setBlobUrl(null);
       setSaveError(null);
       setSaveSuccess(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // Limpar blob URL ao desmontar (evita memory leak)
+  useEffect(() => {
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [blobUrl]);
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Não disponível';
@@ -64,34 +71,18 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
     return new Promise((resolve, reject) => {
       const img = new Image();
       const reader = new FileReader();
-
-      reader.onload = (e) => {
-        img.src = e.target?.result as string;
-      };
+      reader.onload = (e) => { img.src = e.target?.result as string; };
       reader.onerror = () => reject(new Error('Erro ao ler arquivo.'));
-
       img.onload = () => {
         const canvas = document.createElement('canvas');
         let { width, height } = img;
-
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width;
-          width = maxWidth;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
+        if (width > maxWidth) { height = (height * maxWidth) / width; width = maxWidth; }
+        canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Erro ao processar imagem.'));
-          return;
-        }
-
+        if (!ctx) { reject(new Error('Erro ao processar imagem.')); return; }
         ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve(dataUrl);
+        resolve(canvas.toDataURL('image/jpeg', quality));
       };
-
       img.onerror = () => reject(new Error('Erro ao carregar imagem.'));
       reader.readAsDataURL(file);
     });
@@ -100,30 +91,26 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith('image/')) { setSaveError('Escolha uma imagem (JPG, PNG).'); return; }
 
-    if (!file.type.startsWith('image/')) {
-      setSaveError('Escolha uma imagem (JPG, PNG).');
-      return;
-    }
-
-    setIsUploading(true);
-    setSaveError(null);
-    setSaveSuccess(null);
+    setIsUploading(true); setSaveError(null); setSaveSuccess(null);
 
     try {
       console.log('[Avatar] Processando:', file.name, (file.size / 1024).toFixed(1), 'KB');
-
       const dataUrl = await resizeAndCompressImage(file, 400, 0.85);
       const base64Size = dataUrl.length * 0.75;
       console.log('[Avatar] Comprimida:', (base64Size / 1024).toFixed(1), 'KB');
 
-      if (base64Size > MAX_BASE64_SIZE) {
-        setSaveError('Imagem muito grande.');
-        setIsUploading(false);
-        return;
-      }
+      if (base64Size > MAX_BASE64_SIZE) { setSaveError('Imagem muito grande.'); setIsUploading(false); return; }
 
+      // Criar Blob URL para renderização imediata (nunca é bloqueado por AdBlock)
+      const blob = await (await fetch(dataUrl)).blob();
+      const newBlobUrl = URL.createObjectURL(blob);
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      setBlobUrl(newBlobUrl);
       setAvatarDataUrl(dataUrl);
+
+      // Persistir no banco de dados (base64 para persistência)
       await onUpdate({ avatar: dataUrl });
 
       setSaveSuccess('Foto atualizada!');
@@ -138,48 +125,24 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
   };
 
   const handleSave = async () => {
-    setIsSaving(true);
-    setSaveError(null);
-    setSaveSuccess(null);
-
+    setIsSaving(true); setSaveError(null); setSaveSuccess(null);
     try {
       const trimmedName = fullName.trim();
-      if (!trimmedName) {
-        setSaveError('O nome não pode estar vazio.');
-        setIsSaving(false);
-        return;
-      }
-
+      if (!trimmedName) { setSaveError('O nome não pode estar vazio.'); setIsSaving(false); return; }
       await onUpdate({ full_name: trimmedName, username: username.trim(), avatar: avatarDataUrl });
-
       setSaveSuccess('Perfil salvo!');
-    } catch (err: any) {
-      setSaveError(err.message || 'Erro ao salvar.');
-    } finally {
-      setIsSaving(false);
-    }
+    } catch (err: any) { setSaveError(err.message || 'Erro ao salvar.'); }
+    finally { setIsSaving(false); }
   };
 
   const handleDeleteAccount = async () => {
-    if (deleteConfirmText.trim().toLowerCase() !== 'excluir') {
-      setDeleteError('Digite "excluir".');
-      return;
-    }
-    setIsDeleting(true);
-    setDeleteError(null);
+    if (deleteConfirmText.trim().toLowerCase() !== 'excluir') { setDeleteError('Digite "excluir".'); return; }
+    setIsDeleting(true); setDeleteError(null);
     try {
       const result = await onDeleteAccount();
-      if (result.success) {
-        setShowDeleteConfirm(false);
-        onClose();
-      } else {
-        setDeleteError(result.message);
-      }
-    } catch (e: any) {
-      setDeleteError(e.message || 'Erro.');
-    } finally {
-      setIsDeleting(false);
-    }
+      if (result.success) { setShowDeleteConfirm(false); onClose(); } else { setDeleteError(result.message); }
+    } catch (e: any) { setDeleteError(e.message || 'Erro.'); }
+    finally { setIsDeleting(false); }
   };
 
   if (!profile) return null;
@@ -201,13 +164,12 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
           <div className="flex flex-col items-center gap-2">
             <div className="relative">
               <div className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold bg-violet-600 text-white overflow-hidden">
-                {avatarDataUrl ? (
+                {blobUrl || avatarDataUrl ? (
                   <img
-                    key={avatarDataUrl}
-                    src={avatarDataUrl}
+                    key={blobUrl || avatarDataUrl}
+                    src={blobUrl || avatarDataUrl}
                     alt={fullName}
                     className="w-full h-full object-cover"
-                    onError={() => setAvatarDataUrl('')}
                   />
                 ) : (
                   (fullName || profile?.email || 'U').charAt(0).toUpperCase()
@@ -219,11 +181,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
                 className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-violet-600 hover:bg-violet-500 flex items-center justify-center shadow-lg transition-all hover:scale-110 disabled:opacity-50"
                 title="Trocar foto"
               >
-                {isUploading ? (
-                  <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
-                ) : (
-                  <Camera className="w-3.5 h-3.5 text-white" />
-                )}
+                {isUploading ? <Loader2 className="w-3.5 h-3.5 text-white animate-spin" /> : <Camera className="w-3.5 h-3.5 text-white" />}
               </button>
               <input
                 ref={fileInputRef}
@@ -239,119 +197,37 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
           </div>
 
           {/* Mensagens */}
-          {saveError && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-              <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              {saveError}
-            </div>
-          )}
-          {saveSuccess && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
-              <CheckCircle className="w-4 h-4 flex-shrink-0" />
-              {saveSuccess}
-            </div>
-          )}
+          {saveError && <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm"><XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />{saveError}</div>}
+          {saveSuccess && <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm"><CheckCircle className="w-4 h-4 flex-shrink-0" />{saveSuccess}</div>}
 
-          {/* Nome Completo */}
-          <div>
-            <Label className="text-slate-300">Nome Completo</Label>
-            <Input
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Seu nome completo"
-              className="bg-slate-800 border-slate-700 text-white"
-            />
-          </div>
-
-          {/* Username */}
-          <div>
-            <Label className="text-slate-300">Username</Label>
-            <Input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Seu username"
-              className="bg-slate-800 border-slate-700 text-white"
-            />
-          </div>
+          {/* Nome */}
+          <div><Label className="text-slate-300">Nome Completo</Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Seu nome completo" className="bg-slate-800 border-slate-700 text-white" /></div>
+          <div><Label className="text-slate-300">Username</Label><Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Seu username" className="bg-slate-800 border-slate-700 text-white" /></div>
 
           {/* E-mail */}
-          <div>
-            <Label className="text-slate-300">E-mail</Label>
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-800 border border-slate-700/50">
-              <Mail className="w-4 h-4 text-slate-500" />
-              <span className="text-sm text-slate-400">{profile.email}</span>
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">O e-mail não pode ser alterado.</p>
-          </div>
+          <div><Label className="text-slate-300">E-mail</Label><div className="flex items-center gap-2 p-3 rounded-lg bg-slate-800 border border-slate-700/50"><Mail className="w-4 h-4 text-slate-500" /><span className="text-sm text-slate-400">{profile.email}</span></div><p className="text-[10px] text-slate-500 mt-1">O e-mail não pode ser alterado.</p></div>
 
           {/* Membro desde */}
-          <div>
-            <Label className="text-slate-300">Membro desde</Label>
-            <div className="text-sm px-3 py-2 rounded-lg bg-slate-800 border border-slate-700/50 text-slate-400">
-              {formatDate(profile?.created_at)}
-            </div>
-          </div>
+          <div><Label className="text-slate-300">Membro desde</Label><div className="text-sm px-3 py-2 rounded-lg bg-slate-800 border border-slate-700/50 text-slate-400">{formatDate(profile?.created_at)}</div></div>
 
           {/* Ações */}
           <div className="flex justify-between pt-4 gap-2">
-            <Button
-              variant="outline"
-              onClick={() => { setShowDeleteConfirm(true); setDeleteConfirmText(''); setDeleteError(null); }}
-              className="text-red-500 border-red-500/50 hover:bg-red-500/10 hover:text-red-600 bg-transparent"
-            >
-              <Trash2 className="w-4 h-4 mr-2" /> Excluir conta
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={isSaving || isUploading}
-              className="bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50"
-            >
-              {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-              {isSaving ? 'Salvando...' : 'Salvar'}
-            </Button>
+            <Button variant="outline" onClick={() => { setShowDeleteConfirm(true); setDeleteConfirmText(''); setDeleteError(null); }} className="text-red-500 border-red-500/50 hover:bg-red-500/10 hover:text-red-600 bg-transparent"><Trash2 className="w-4 h-4 mr-2" /> Excluir conta</Button>
+            <Button onClick={handleSave} disabled={isSaving || isUploading} className="bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50">{isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}{isSaving ? 'Salvando...' : 'Salvar'}</Button>
           </div>
         </div>
 
-        {/* Confirmação de exclusão */}
+        {/* Confirmação delete */}
         {showDeleteConfirm && (
           <div className="mt-4 p-4 rounded-lg border border-red-800 bg-red-900/20 animate-in fade-in slide-in-from-top-2">
-            <div className="flex items-center gap-2 text-red-500 mb-2">
-              <AlertTriangle className="w-5 h-5" />
-              <span className="font-bold">Ação Irreversível</span>
-            </div>
-            <p className="text-xs mb-3 text-slate-400">
-              Todos os seus dados serão removidos permanentemente.
-            </p>
-            <p className="text-xs mb-2 font-medium text-slate-300">
-              Digite <strong>excluir</strong> para confirmar:
-            </p>
-            <Input
-              type="text"
-              value={deleteConfirmText}
-              onChange={(e) => setDeleteConfirmText(e.target.value)}
-              placeholder="excluir"
-              className="bg-slate-800 border-slate-700 text-white text-sm mb-3"
-              onKeyDown={(e) => e.key === 'Enter' && handleDeleteAccount()}
-            />
+            <div className="flex items-center gap-2 text-red-500 mb-2"><AlertTriangle className="w-5 h-5" /><span className="font-bold">Ação Irreversível</span></div>
+            <p className="text-xs mb-3 text-slate-400">Todos os seus dados serão removidos permanentemente.</p>
+            <p className="text-xs mb-2 font-medium text-slate-300">Digite <strong>excluir</strong> para confirmar:</p>
+            <Input type="text" value={deleteConfirmText} onChange={(e) => setDeleteConfirmText(e.target.value)} placeholder="excluir" className="bg-slate-800 border-slate-700 text-white text-sm mb-3" onKeyDown={(e) => e.key === 'Enter' && handleDeleteAccount()} />
             {deleteError && <p className="text-xs text-red-400 mb-3">{deleteError}</p>}
             <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowDeleteConfirm(false)}
-                className="border-slate-700 text-white hover:bg-slate-800"
-              >
-                Cancelar
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleDeleteAccount}
-                disabled={isDeleting}
-                className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
-              >
-                {isDeleting ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 mr-1" />}
-                {isDeleting ? 'Excluindo...' : 'Confirmar'}
-              </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowDeleteConfirm(false)} className="border-slate-700 text-white hover:bg-slate-800">Cancelar</Button>
+              <Button size="sm" onClick={handleDeleteAccount} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50">{isDeleting ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 mr-1" />}{isDeleting ? 'Excluindo...' : 'Confirmar'}</Button>
             </div>
           </div>
         )}
