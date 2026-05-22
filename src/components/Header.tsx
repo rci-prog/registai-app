@@ -1,12 +1,17 @@
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import { LogOut, Shield, User, UserPlus, Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import type { AppNotification } from '@/hooks/useNotifications';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
 import { NotificationDetailModal } from '@/components/NotificationDetailModal';
 
 interface HeaderProps {
@@ -65,7 +70,7 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
             <rect x="23" y="20" width="5" height="5" rx="1" fill="#c4b5fd" opacity="0.9" />
             <circle cx="20" cy="13" r="2.5" fill="#06b6d4" />
           </svg>
-
+          
           <div>
             <h1 className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
               registAI
