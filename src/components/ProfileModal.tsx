@@ -41,6 +41,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Só sincroniza quando o modal abre
   useEffect(() => {
     if (open && profile) {
       setFullName(profile.name || '');
@@ -53,6 +54,15 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Quando o pai atualiza o profile (ex: após onUpdate salvar no banco),
+  // sincronizar avatarDataUrl SE for base64 (ignorar URLs do Storage)
+  useEffect(() => {
+    if (profile?.avatar && profile.avatar.startsWith('data:') && profile.avatar !== avatarDataUrl) {
+      setAvatarDataUrl(profile.avatar);
+    }
+  }, [profile?.avatar, avatarDataUrl]);
+
+  // Limpar blob URL ao desmontar
   useEffect(() => {
     return () => {
       if (blobUrl) URL.revokeObjectURL(blobUrl);
