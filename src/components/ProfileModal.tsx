@@ -24,10 +24,13 @@ interface ProfileModalProps {
   onDeleteAccount: () => Promise<{ success: boolean; message: string }>;
 }
 
+// Tamanho máximo da imagem base64 no banco: 500KB
+const MAX_BASE64_SIZE = 500 * 1024;
+
 export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, onDeleteAccount }: ProfileModalProps) {
   const [fullName, setFullName] = useState(profile?.name || '');
   const [username, setUsername] = useState(profile?.username || '');
-  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar || '');
+  const [avatarDataUrl, setAvatarDataUrl] = useState(profile?.avatar || '');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -43,7 +46,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
     if (open && profile) {
       setFullName(profile.name || '');
       setUsername(profile.username || '');
-      setAvatarUrl(profile.avatar || '');
+      setAvatarDataUrl(profile.avatar || '');
       setSaveError(null);
       setSaveSuccess(null);
     }
@@ -54,10 +57,48 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
     return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
   };
 
-  // Upload de foto: escolhe arquivo → sobe para Storage → persiste no profile
+  // Redimensiona e comprime a imagem antes de converter para base64
+  const resizeAndCompressImage = (file: File, maxWidth: number = 400, quality: number = 0.85): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Erro ao ler arquivo.'));
+
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Erro ao processar imagem.'));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+
+      img.onerror = () => reject(new Error('Erro ao carregar imagem.'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Upload de foto: escolhe arquivo → converte para base64 → persiste no profile
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !profile?.id) return;
+    if (!file) return;
 
     if (!file.type.startsWith('image/')) {
       setSaveError('Escolha um arquivo de imagem (JPG, PNG).');
@@ -69,56 +110,39 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
     setSaveSuccess(null);
 
     try {
-      // Caminho fixo: userId/avatar.jpg — sempre sobrescreve (upsert)
-      const filePath = `${profile.id}/avatar.jpg`;
+      console.log('[Avatar] Processando imagem:', file.name, (file.size / 1024).toFixed(1), 'KB');
 
-      console.log('[Avatar] Fazendo upload:', filePath, file.type);
+      // 1. Redimensionar e comprimir → base64
+      const dataUrl = await resizeAndCompressImage(file, 400, 0.85);
+      const base64Size = dataUrl.length * 0.75; // aproximado
+      console.log('[Avatar] Imagem comprimida:', (base64Size / 1024).toFixed(1), 'KB');
 
-      // 1. Upload para o Storage
-      const { error: uploadErr } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file, { upsert: true, contentType: file.type });
-
-      if (uploadErr) {
-        console.error('[Avatar] Erro upload:', uploadErr.message);
-        setSaveError('Erro no upload: ' + uploadErr.message);
+      if (base64Size > MAX_BASE64_SIZE) {
+        setSaveError('Imagem muito grande. Escolha uma menor.');
         setIsUploading(false);
         return;
       }
 
-      // 2. Obter URL assinada (funciona mesmo com bucket privado)
-      const { data: signedData, error: signedError } = await supabase.storage
-        .from('avatars')
-        .createSignedUrl(filePath, 60 * 60 * 24 * 365); // válida por 1 ano
-
-      if (signedError || !signedData?.signedUrl) {
-        console.error('[Avatar] Erro signed URL:', signedError?.message);
-        // Fallback: tentar URL pública
-        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
-        const publicUrl = urlData?.publicUrl;
-        if (!publicUrl) {
-          setSaveError('Erro ao gerar URL da imagem.');
-          setIsUploading(false);
-          return;
+      // 2. Salvar no Supabase Storage (backup opcional)
+      if (profile?.id) {
+        try {
+          const filePath = `${profile.id}/avatar.jpg`;
+          await supabase.storage.from('avatars').upload(filePath, file, { upsert: true, contentType: file.type });
+          console.log('[Avatar] Backup no Storage OK');
+        } catch {
+          // Falha no Storage não impede o salvamento base64
+          console.warn('[Avatar] Backup no Storage falhou, continuando com base64');
         }
-        setAvatarUrl(publicUrl);
-        await onUpdate({ avatar: publicUrl });
-        setSaveSuccess('Foto atualizada!');
-        setIsUploading(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        return;
       }
 
-      const publicUrl = signedData.signedUrl;
-
-      // 3. Atualizar estado local (feedback visual imediato)
-      setAvatarUrl(publicUrl);
+      // 3. Atualizar estado local imediatamente (feedback visual)
+      setAvatarDataUrl(dataUrl);
 
       // 4. Persistir no banco de dados
-      await onUpdate({ avatar: publicUrl });
+      await onUpdate({ avatar: dataUrl });
 
       setSaveSuccess('Foto atualizada!');
-      console.log('[Avatar] OK:', publicUrl);
+      console.log('[Avatar] ✅ OK');
     } catch (err: any) {
       console.error('[Avatar] Erro:', err);
       setSaveError('Erro: ' + (err.message || 'Tente novamente.'));
@@ -144,7 +168,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
       await onUpdate({
         full_name: trimmedName,
         username: username.trim(),
-        avatar: avatarUrl,
+        avatar: avatarDataUrl,
       });
 
       setSaveSuccess('Perfil salvo!');
@@ -196,13 +220,13 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
           <div className="flex flex-col items-center gap-2">
             <div className="relative">
               <div className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold bg-violet-600 text-white overflow-hidden">
-                {avatarUrl ? (
+                {avatarDataUrl ? (
                   <img
-                    key={avatarUrl}
-                    src={avatarUrl}
+                    key={avatarDataUrl}
+                    src={avatarDataUrl}
                     alt={fullName}
                     className="w-full h-full object-cover"
-                    onError={() => setAvatarUrl('')}
+                    onError={() => setAvatarDataUrl('')}
                   />
                 ) : (
                   (fullName || profile?.email || 'U').charAt(0).toUpperCase()
@@ -229,7 +253,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
               />
             </div>
             <p className="text-[11px] text-slate-500">
-              {isUploading ? 'Enviando...' : 'Clique na câmera para trocar a foto'}
+              {isUploading ? 'Processando...' : 'Clique na câmera para trocar a foto'}
             </p>
           </div>
 
