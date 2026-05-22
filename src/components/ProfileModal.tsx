@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase';
 
 interface ProfileModalProps {
   open: boolean;
-  onClose: () => void;
+n  onClose: () => void;
   profile: {
     id: string;
     email: string;
@@ -20,12 +20,12 @@ interface ProfileModalProps {
     username?: string;
   } | null;
   theme?: 'light' | 'dark';
-  onUpdate: (updates: { name?: string; avatar?: string; username?: string }) => Promise<void>;
+  onUpdate: (updates: { full_name?: string; name?: string; avatar?: string; username?: string }) => Promise<void>;
   onDeleteAccount: () => Promise<{ success: boolean; message: string }>;
 }
 
 export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, onDeleteAccount }: ProfileModalProps) {
-  const [name, setName] = useState(profile?.name || '');
+  const [fullName, setFullName] = useState(profile?.name || '');
   const [username, setUsername] = useState(profile?.username || '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar || '');
   const [isSaving, setIsSaving] = useState(false);
@@ -34,16 +34,14 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Confirmação de exclusão
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Sincronizar estado quando o modal abre
   useEffect(() => {
     if (open && profile) {
-      setName(profile.name || '');
+      setFullName(profile.name || '');
       setUsername(profile.username || '');
       setAvatarUrl(profile.avatar || '');
       setSaveError(null);
@@ -51,12 +49,15 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
     }
   }, [open, profile?.id, profile?.name, profile?.username, profile?.avatar]);
 
-  // Upload de foto para o Supabase Storage
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'Não disponível';
+    return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !profile?.id) return;
 
-    // Validações
     if (!file.type.startsWith('image/')) {
       setSaveError('O arquivo deve ser uma imagem (JPG, PNG, WEBP).');
       return;
@@ -75,7 +76,6 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
       const fileName = `${profile.id}-${Date.now()}.${fileExt}`;
       const filePath = `public/${fileName}`;
 
-      // 1. Upload para o bucket 'avatars'
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file, { upsert: true, contentType: file.type });
@@ -84,7 +84,6 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
         throw new Error(`Falha no upload: ${uploadError.message}`);
       }
 
-      // 2. Obter URL pública
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
       const publicUrl = urlData?.publicUrl;
 
@@ -93,11 +92,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
       }
 
       const urlWithTimestamp = `${publicUrl}?t=${Date.now()}`;
-
-      // 3. Atualizar avatar local imediatamente
       setAvatarUrl(urlWithTimestamp);
-
-      // 4. Persistir no profile do Supabase
       await onUpdate({ avatar: urlWithTimestamp });
 
       setSaveSuccess('Foto de perfil atualizada!');
@@ -110,14 +105,13 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
     }
   };
 
-  // Salvar nome e username
   const handleSave = async () => {
     setIsSaving(true);
     setSaveError(null);
     setSaveSuccess(null);
 
     try {
-      const trimmedName = name.trim();
+      const trimmedName = fullName.trim();
       if (!trimmedName) {
         setSaveError('O nome não pode estar vazio.');
         setIsSaving(false);
@@ -125,7 +119,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
       }
 
       await onUpdate({
-        name: trimmedName,
+        full_name: trimmedName,
         username: username.trim(),
         avatar: avatarUrl,
       });
@@ -139,7 +133,6 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
     }
   };
 
-  // Excluir conta com confirmação
   const handleDeleteAccount = async () => {
     if (deleteConfirmText.trim().toLowerCase() !== 'excluir') {
       setDeleteError('Digite "excluir" para confirmar.');
@@ -164,11 +157,6 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
     }
   };
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return 'Não disponível';
-    return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-  };
-
   if (!profile) return null;
 
   return (
@@ -191,12 +179,12 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
-                    alt={name}
+                    alt={fullName}
                     className="w-full h-full object-cover"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
                 ) : (
-                  (name || profile?.email || 'U').charAt(0).toUpperCase()
+                  (fullName || profile?.email || 'U').charAt(0).toUpperCase()
                 )}
               </div>
               <button
@@ -236,13 +224,13 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
             </div>
           )}
 
-          {/* Nome */}
+          {/* Nome Completo */}
           <div>
             <Label className="text-slate-300">Nome Completo</Label>
             <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Seu nome"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Seu nome completo"
               className="bg-slate-800 border-slate-700 text-white focus:ring-violet-500"
             />
           </div>
@@ -276,7 +264,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
             </div>
           </div>
 
-          {/* Ações: Excluir conta + Salvar */}
+          {/* Ações */}
           <div className="flex justify-between pt-4 gap-2">
             <Button
               variant="outline"
