@@ -46,7 +46,6 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
       setAvatarUrl(profile.avatar || '');
       setSaveError(null);
       setSaveSuccess(null);
-      console.log('[ProfileModal] useEffect sincronizou avatar:', profile.avatar || '(vazio)');
     }
   }, [open, profile?.id, profile?.name, profile?.username, profile?.avatar]);
 
@@ -55,23 +54,13 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
     return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
   };
 
+  // Upload de foto: escolhe arquivo → sobe para Storage → persiste no profile
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !profile?.id) {
-      console.log('[Profile] ❌ Sem arquivo ou sem profile.id');
-      return;
-    }
-
-    console.log('[Profile] ===== INÍCIO DO UPLOAD =====');
-    console.log('[Profile] Arquivo:', file.name, '| Tipo:', file.type, '| Tamanho:', (file.size / 1024).toFixed(1), 'KB');
-    console.log('[Profile] profile.id:', profile.id);
+    if (!file || !profile?.id) return;
 
     if (!file.type.startsWith('image/')) {
-      setSaveError('O arquivo deve ser uma imagem (JPG, PNG, WEBP).');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setSaveError('A imagem deve ter no máximo 5MB.');
+      setSaveError('Escolha um arquivo de imagem (JPG, PNG).');
       return;
     }
 
@@ -80,40 +69,47 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
     setSaveSuccess(null);
 
     try {
-      // CORREÇÃO: Caminho direto no storage para garantir consistência
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const filePath = `${profile.id}/avatar.${fileExt}`;
-      
-      console.log('[Profile] Caminho do upload:', filePath);
+      // Caminho fixo: userId/avatar.jpg — sempre sobrescreve (upsert)
+      const filePath = `${profile.id}/avatar.jpg`;
 
-      // 1. Upload para o bucket 'avatars'
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      console.log('[Avatar] Fazendo upload:', filePath, file.type);
+
+      // 1. Upload para o Storage
+      const { error: uploadErr } = await supabase.storage
         .from('avatars')
         .upload(filePath, file, { upsert: true, contentType: file.type });
 
-      if (uploadError) {
-        console.error('[Profile] ❌ Erro no upload:', uploadError.name, '-', uploadError.message);
-        throw new Error(`Falha no upload [${uploadError.name}]: ${uploadError.message}`);
+      if (uploadErr) {
+        console.error('[Avatar] Erro upload:', uploadErr.message);
+        setSaveError('Erro no upload: ' + uploadErr.message);
+        setIsUploading(false);
+        return;
       }
 
-      // 2. Obter URL pública corrigida
-      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      const publicUrl = `${data.publicUrl}?t=${Date.now()}`;
+      // 2. Obter URL pública
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      const publicUrl = urlData?.publicUrl;
 
-      // 3. Atualizar estado local
+      if (!publicUrl) {
+        setSaveError('Erro ao gerar URL da imagem.');
+        setIsUploading(false);
+        return;
+      }
+
+      // 3. Atualizar estado local (feedback visual imediato)
       setAvatarUrl(publicUrl);
 
       // 4. Persistir no banco de dados
       await onUpdate({ avatar: publicUrl });
 
-      setSaveSuccess('Foto de perfil atualizada!');
+      setSaveSuccess('Foto atualizada!');
+      console.log('[Avatar] OK:', publicUrl);
     } catch (err: any) {
-      console.error('[Profile] ❌ Erro completo:', err);
-      setSaveError(err.message || 'Erro ao fazer upload da imagem.');
+      console.error('[Avatar] Erro:', err);
+      setSaveError('Erro: ' + (err.message || 'Tente novamente.'));
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      console.log('[Profile] ===== FIM DO UPLOAD =====');
     }
   };
 
@@ -136,9 +132,9 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
         avatar: avatarUrl,
       });
 
-      setSaveSuccess('Perfil salvo com sucesso!');
+      setSaveSuccess('Perfil salvo!');
     } catch (err: any) {
-      setSaveError(err.message || 'Erro ao salvar perfil.');
+      setSaveError(err.message || 'Erro ao salvar.');
     } finally {
       setIsSaving(false);
     }
@@ -149,13 +145,11 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
       setDeleteError('Digite "excluir" para confirmar.');
       return;
     }
-
     setIsDeleting(true);
     setDeleteError(null);
-
     try {
       const result = await onDeleteAccount();
-      if (result.success) {
+n      if (result.success) {
         setShowDeleteConfirm(false);
         onClose();
       } else {
@@ -180,18 +174,20 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
           <DialogDescription className="text-slate-400">
             Gerencie suas informações de perfil.
           </DialogDescription>
-        </DialogHeader>
+n        </DialogHeader>
 
         <div className="space-y-4 pt-4">
+          {/* Avatar com upload clicável */}
           <div className="flex flex-col items-center gap-2">
             <div className="relative">
               <div className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold bg-violet-600 text-white overflow-hidden">
                 {avatarUrl ? (
                   <img
+                    key={avatarUrl}
                     src={avatarUrl}
                     alt={fullName}
                     className="w-full h-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    onError={() => setAvatarUrl('')}
                   />
                 ) : (
                   (fullName || profile?.email || 'U').charAt(0).toUpperCase()
@@ -201,14 +197,28 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
                 className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-violet-600 hover:bg-violet-500 flex items-center justify-center shadow-lg transition-all hover:scale-110 disabled:opacity-50"
+                title="Trocar foto"
               >
-                {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                {isUploading ? (
+                  <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+                ) : (
+                  <Camera className="w-3.5 h-3.5 text-white" />
+                )}
               </button>
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
             </div>
-            <p className="text-[11px] text-slate-500">Clique na câmera para trocar a foto</p>
+            <p className="text-[11px] text-slate-500">
+              {isUploading ? 'Enviando...' : 'Clique na câmera para trocar a foto'}
+            </p>
           </div>
 
+          {/* Mensagens */}
           {saveError && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
               <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -222,24 +232,39 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
             </div>
           )}
 
+          {/* Nome Completo */}
           <div>
             <Label className="text-slate-300">Nome Completo</Label>
-            <Input value={fullName} onChange={(e) => setFullName(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
+            <Input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Seu nome completo"
+              className="bg-slate-800 border-slate-700 text-white focus:ring-violet-500"
+            />
           </div>
 
+          {/* Username */}
           <div>
             <Label className="text-slate-300">Username</Label>
-            <Input value={username} onChange={(e) => setUsername(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
+            <Input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Seu username"
+              className="bg-slate-800 border-slate-700 text-white focus:ring-violet-500"
+            />
           </div>
 
+          {/* E-mail */}
           <div>
             <Label className="text-slate-300">E-mail</Label>
             <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-800 border border-slate-700/50">
               <Mail className="w-4 h-4 text-slate-500" />
               <span className="text-sm text-slate-400">{profile.email}</span>
             </div>
+            <p className="text-[10px] text-slate-500 mt-1">O e-mail não pode ser alterado.</p>
           </div>
 
+          {/* Membro desde */}
           <div>
             <Label className="text-slate-300">Membro desde</Label>
             <div className="text-sm px-3 py-2 rounded-lg bg-slate-800 border border-slate-700/50 text-slate-400">
@@ -247,26 +272,74 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
             </div>
           </div>
 
+          {/* Ações */}
           <div className="flex justify-between pt-4 gap-2">
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(true)} className="text-red-500 border-red-500/50 hover:bg-red-500/10">
+            <Button
+              variant="outline"
+              onClick={() => { setShowDeleteConfirm(true); setDeleteConfirmText(''); setDeleteError(null); }}
+              className="text-red-500 border-red-500/50 hover:bg-red-500/10 hover:text-red-600 bg-transparent"
+            >
               <Trash2 className="w-4 h-4 mr-2" /> Excluir conta
             </Button>
-            <Button onClick={handleSave} disabled={isSaving || isUploading} className="bg-violet-600 hover:bg-violet-700">
+            <Button
+              onClick={handleSave}
+              disabled={isSaving || isUploading}
+              className="bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50"
+            >
+              {isSaving ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
               {isSaving ? 'Salvando...' : 'Salvar'}
             </Button>
           </div>
         </div>
 
+        {/* Confirmação de exclusão */}
         {showDeleteConfirm && (
-          <div className="mt-4 p-4 rounded-lg border border-red-800 bg-red-900/20">
-             <div className="flex items-center gap-2 text-red-500 mb-2">
+          <div className="mt-4 p-4 rounded-lg border border-red-800 bg-red-900/20 animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-2 text-red-500 mb-2">
               <AlertTriangle className="w-5 h-5" />
               <span className="font-bold">Ação Irreversível</span>
             </div>
-            <Input value={deleteConfirmText} onChange={(e) => setDeleteConfirmText(e.target.value)} placeholder="excluir" className="bg-slate-800 border-slate-700 text-white mb-3" />
+            <p className="text-xs mb-3 text-slate-400">
+              Todos os seus dados serão removidos permanentemente.
+            </p>
+            <p className="text-xs mb-2 font-medium text-slate-300">
+              Digite <strong>excluir</strong> para confirmar:
+            </p>
+            <Input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="excluir"
+              className="bg-slate-800 border-slate-700 text-white text-sm mb-3"
+              onKeyDown={(e) => e.key === 'Enter' && handleDeleteAccount()}
+            />
+            {deleteError && <p className="text-xs text-red-400 mb-3">{deleteError}</p>}
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setShowDeleteConfirm(false)}>Cancelar</Button>
-              <Button size="sm" onClick={handleDeleteAccount} className="bg-red-600">Confirmar</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="border-slate-700 text-white hover:bg-slate-800"
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5 mr-1" />
+                )}
+                {isDeleting ? 'Excluindo...' : 'Confirmar exclusão'}
+              </Button>
             </div>
           </div>
         )}
