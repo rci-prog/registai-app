@@ -118,8 +118,9 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
         return;
       }
 
+      // CORREÇÃO: Usando full_name em vez de name
       await onUpdate({
-        full_name: trimmedName,
+        full_name: trimmedName, 
         username: username.trim(),
         avatar: avatarUrl,
       });
@@ -127,7 +128,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
       setSaveSuccess('Perfil salvo com sucesso!');
     } catch (err: any) {
       console.error('[Profile] Erro ao salvar:', err.message);
-      setSaveError(err.message || 'Erro ao salvar perfil. Tente novamente.');
+      setSaveError(err.message || 'Erro ao salvar perfil.');
     } finally {
       setIsSaving(false);
     }
