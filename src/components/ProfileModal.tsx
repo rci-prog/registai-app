@@ -149,7 +149,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
     setDeleteError(null);
     try {
       const result = await onDeleteAccount();
-n      if (result.success) {
+       if (result.success) {
         setShowDeleteConfirm(false);
         onClose();
       } else {
