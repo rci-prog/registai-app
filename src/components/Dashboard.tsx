@@ -103,21 +103,32 @@ export function Dashboard() {
       if (!currentUser?.id) return;
       
       try {
-        // --- 1. Verificação de Reativação (Trava via URL/Session) ---
-        const urlParams = new URLSearchParams(window.location.search);
-        const isReactive = urlParams.get('reactive') === 'true';
-        const isBlockedSession = sessionStorage.getItem('bloqueio_reativacao_ativo') === 'true';
+        // --- 1. Verificação de Reativação (Corrigida) ---
+const urlParams = new URLSearchParams(window.location.search);
+const isReactive = urlParams.get('reactive') === 'true';
+const isBlockedSession = sessionStorage.getItem('bloqueio_reativacao_ativo') === 'true';
 
-        if ((isReactive || isBlockedSession) && !isBlockedRef.current) {
-          isBlockedRef.current = true;
-          if (isReactive) sessionStorage.setItem('bloqueio_reativacao_ativo', 'true');
-          
-          console.log('[Dashboard] 🛑 Bloqueio de reativação detectado.');
-          await logout();
-          setLoginError('Conta reativada! Faça login novamente para aceitar os termos.');
-          setIsLoginOpen(true);
-          return;
-        }
+if ((isReactive || isBlockedSession) && !isBlockedRef.current) {
+  isBlockedRef.current = true; // Impede a re-execução deste bloco
+  
+  // Limpa o estado no navegador para parar o loop
+  if (isReactive) {
+    sessionStorage.setItem('bloqueio_reativacao_ativo', 'true');
+    // Remove o parâmetro 'reactive' da URL sem recarregar a página
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, document.title, newUrl);
+  }
+  
+  console.log('[Dashboard] 🛑 Bloqueio de reativação processado. Iniciando logout...');
+  
+  await logout();
+  
+  // Garante que o estado de login está fechado
+  setIsLoginOpen(true);
+  setLoginError('Conta reativada! Faça login novamente para aceitar os termos.');
+  
+  return; // Sai do useEffect aqui, não continua para o fetch dos dados
+}
 
         // --- 2. Verificação de Integridade (Supabase) ---
         const storageKey = Object.keys(localStorage).find(key => key.startsWith('sb-') && key.endsWith('-auth-token'));
