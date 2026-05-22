@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase';
 
 interface ProfileModalProps {
   open: boolean;
-n  onClose: () => void;
+  onClose: () => void;
   profile: {
     id: string;
     email: string;
@@ -46,6 +46,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
       setAvatarUrl(profile.avatar || '');
       setSaveError(null);
       setSaveSuccess(null);
+      console.log('[ProfileModal] useEffect sincronizou avatar:', profile.avatar || '(vazio)');
     }
   }, [open, profile?.id, profile?.name, profile?.username, profile?.avatar]);
 
@@ -56,7 +57,14 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !profile?.id) return;
+    if (!file || !profile?.id) {
+      console.log('[Profile] ❌ Sem arquivo ou sem profile.id');
+      return;
+    }
+
+    console.log('[Profile] ===== INÍCIO DO UPLOAD =====');
+    console.log('[Profile] Arquivo:', file.name, '| Tipo:', file.type, '| Tamanho:', (file.size / 1024).toFixed(1), 'KB');
+    console.log('[Profile] profile.id:', profile.id);
 
     if (!file.type.startsWith('image/')) {
       setSaveError('O arquivo deve ser uma imagem (JPG, PNG, WEBP).');
@@ -75,33 +83,50 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
       const fileExt = file.name.split('.').pop() || 'jpg';
       const fileName = `${profile.id}-${Date.now()}.${fileExt}`;
       const filePath = `public/${fileName}`;
+      console.log('[Profile] Caminho do upload:', filePath);
 
-      const { error: uploadError } = await supabase.storage
+      // 1. Upload para o bucket 'avatars'
+      console.log('[Profile] Enviando para supabase.storage.from("avatars").upload()...');
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file, { upsert: true, contentType: file.type });
 
       if (uploadError) {
-        throw new Error(`Falha no upload: ${uploadError.message}`);
+        console.error('[Profile] ❌ Erro no upload:', uploadError.name, '-', uploadError.message);
+        throw new Error(`Falha no upload [${uploadError.name}]: ${uploadError.message}`);
       }
+      console.log('[Profile] ✅ Upload bem-sucedido:', uploadData?.path || filePath);
 
+      // 2. Obter URL pública
+      console.log('[Profile] Obtendo URL pública...');
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
       const publicUrl = urlData?.publicUrl;
+      console.log('[Profile] URL pública bruta:', publicUrl);
 
       if (!publicUrl) {
         throw new Error('Não foi possível obter a URL da imagem.');
       }
 
       const urlWithTimestamp = `${publicUrl}?t=${Date.now()}`;
+      console.log('[Profile] URL com timestamp:', urlWithTimestamp);
+
+      // 3. Atualizar estado local
       setAvatarUrl(urlWithTimestamp);
+      console.log('[Profile] Estado local atualizado');
+
+      // 4. Persistir no profile do Supabase
+      console.log('[Profile] Chamando onUpdate({ avatar: url })...');
       await onUpdate({ avatar: urlWithTimestamp });
+      console.log('[Profile] ✅ onUpdate concluído');
 
       setSaveSuccess('Foto de perfil atualizada!');
     } catch (err: any) {
-      console.error('[Profile] Erro no upload:', err.message);
+      console.error('[Profile] ❌ Erro completo:', err);
       setSaveError(err.message || 'Erro ao fazer upload da imagem.');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      console.log('[Profile] ===== FIM DO UPLOAD =====');
     }
   };
 
@@ -118,17 +143,18 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
         return;
       }
 
-      // CORREÇÃO: Usando full_name em vez de name
+      console.log('[Profile] Salvando perfil:', { full_name: trimmedName, username: username.trim() });
       await onUpdate({
-        full_name: trimmedName, 
+        full_name: trimmedName,
         username: username.trim(),
         avatar: avatarUrl,
       });
+      console.log('[Profile] ✅ Perfil salvo com sucesso');
 
       setSaveSuccess('Perfil salvo com sucesso!');
     } catch (err: any) {
-      console.error('[Profile] Erro ao salvar:', err.message);
-      setSaveError(err.message || 'Erro ao salvar perfil.');
+      console.error('[Profile] ❌ Erro ao salvar:', err.message);
+      setSaveError(err.message || 'Erro ao salvar perfil. Tente novamente.');
     } finally {
       setIsSaving(false);
     }
@@ -182,7 +208,11 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
                     src={avatarUrl}
                     alt={fullName}
                     className="w-full h-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    onError={(e) => {
+                      console.warn('[ProfileModal] img onError - URL falhou:', avatarUrl);
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                    onLoad={() => console.log('[ProfileModal] img onLoad - imagem carregada:', avatarUrl.substring(0, 60) + '...')}
                   />
                 ) : (
                   (fullName || profile?.email || 'U').charAt(0).toUpperCase()
