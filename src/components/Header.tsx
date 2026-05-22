@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,7 +26,7 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
   const [detailOpen, setDetailOpen] = useState(false);
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearAllNotifications } = useNotifications(currentUser?.email);
 
-  // Ignorar URLs do Supabase Storage (bloqueadas por AdBlock)
+  // Avatar URL: ignorar URLs do Supabase Storage (bloqueadas por AdBlock)
   const rawAvatar = currentUser?.avatar || profile?.avatar || '';
   const avatarUrl = rawAvatar && !rawAvatar.includes('supabase.co/storage') ? rawAvatar : '';
   const displayName = currentUser?.name || profile?.name || 'Usuário';
@@ -186,23 +185,24 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-9 w-9 p-0 rounded-full">
-                    {avatarUrl ? (
-                      <Avatar className="w-8 h-8">
-                        <AvatarImage src={avatarUrl} alt={displayName} />
-                        <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs font-medium">
-                          {displayName.charAt(0)?.toUpperCase() || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white text-xs font-medium">
-                        {displayName.charAt(0)?.toUpperCase() || 'U'}
-                      </div>
-                    )}
+                    <div className="h-10 w-10 rounded-full ring-2 ring-violet-500/50 overflow-hidden flex items-center justify-center bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white">
+                      {avatarUrl ? (
+                        <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url(${avatarUrl})` }} />
+                      ) : displayName.charAt(0)}
+                    </div>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-slate-900 border-slate-700 text-white" align="end">
-                  <div className="px-2 py-1.5 text-xs text-slate-500 border-b border-slate-700">
-                    {currentUser.email}
+                  <div className="px-3 py-2 border-b border-slate-700 flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs">
+                      {avatarUrl ? (
+                        <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url(${avatarUrl})` }} />
+                      ) : displayName.charAt(0)}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-white">{displayName}</span>
+                      <span className="text-[11px] text-slate-400">{currentUser.email}</span>
+                    </div>
                   </div>
                   <DropdownMenuItem onClick={onProfile} className="cursor-pointer text-slate-300 focus:text-white focus:bg-slate-800">
                     <User className="w-4 h-4 mr-2" />
