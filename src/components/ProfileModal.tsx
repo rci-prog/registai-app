@@ -59,12 +59,12 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
     return () => {
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
-n  }, [blobUrl]);
+   }, [blobUrl]);
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Não disponível';
     return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-n  };
+  };
 
   const resizeAndCompressImage = (file: File, maxWidth: number = 400, quality: number = 0.85): Promise<string> => {
     return new Promise((resolve, reject) => {
