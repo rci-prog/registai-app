@@ -142,6 +142,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
   if (!profile) return null;
 
   const displayUrl = blobUrl || (avatarDataUrl && !avatarDataUrl.includes('supabase.co/storage') ? avatarDataUrl : '');
+  console.log('[Avatar] Render — blobUrl:', blobUrl ? 'SIM' : 'NÃO', '| avatarDataUrl:', avatarDataUrl ? (avatarDataUrl.substring(0, 30) + '...') : 'vazio', '| displayUrl:', displayUrl ? (displayUrl.substring(0, 30) + '...') : 'vazio');
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
