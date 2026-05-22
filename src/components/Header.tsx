@@ -16,11 +16,16 @@ interface HeaderProps {
 }
 
 export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
-  const { currentUser, isAdmin, theme, logout } = useAuth();
+  const { currentUser, isAdmin, theme, logout, profile } = useAuth();
   const [notifOpen, setNotifOpen] = useState(false);
   const [detailNotif, setDetailNotif] = useState<AppNotification | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearAllNotifications } = useNotifications(currentUser?.email);
+
+  // Ignorar URLs do Supabase Storage (bloqueadas por AdBlock)
+  const rawAvatar = currentUser?.avatar || profile?.avatar || '';
+  const avatarUrl = rawAvatar && !rawAvatar.includes('supabase.co/storage') ? rawAvatar : '';
+  const displayName = currentUser?.name || profile?.name || 'Usuário';
 
   const handleOpenNotifDetail = (notif: AppNotification) => {
     setDetailNotif(notif);
@@ -60,16 +65,16 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
             <rect x="23" y="20" width="5" height="5" rx="1" fill="#c4b5fd" opacity="0.9" />
             <circle cx="20" cy="13" r="2.5" fill="#06b6d4" />
           </svg>
-          
+
           <div>
             <h1 className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
               registAI
             </h1>
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Catalogo Inteligente de IA</p>
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Catálogo Inteligente de IA</p>
           </div>
         </div>
 
-        {/* CENTRO — Botao Painel ADM (mantido apenas para admins) */}
+        {/* CENTRO — Botão Painel ADM (mantido apenas para admins) */}
         {isAdmin && (
           <div className="absolute left-1/2 -translate-x-1/2 hidden sm:block">
             <Button
@@ -105,7 +110,7 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
                 Convidar
               </Button>
 
-              {/* Notifications */}
+              {/* Notificações */}
               <DropdownMenu open={notifOpen} onOpenChange={setNotifOpen}>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-9 w-9 p-0">
@@ -119,7 +124,7 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-72 max-h-80 overflow-y-auto bg-slate-900 border-slate-700 text-white" align="end">
                   <div className="flex items-center justify-between p-2 border-b border-slate-700">
-                    <span className="text-sm font-semibold">Notificacoes</span>
+                    <span className="text-sm font-semibold">Notificações</span>
                     {unreadCount > 0 && (
                       <button
                         onClick={markAllAsRead}
@@ -131,7 +136,7 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
                   </div>
                   {notifications.length === 0 ? (
                     <div className="p-4 text-center text-xs text-slate-500">
-                      Nenhuma notificacao
+                      Nenhuma notificação
                     </div>
                   ) : (
                     <>
@@ -163,7 +168,7 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
                             onClick={(e) => { e.stopPropagation(); clearAllNotifications(); }}
                             className="text-xs text-red-400 hover:text-red-300 transition-colors"
                           >
-                            Limpar notificacoes
+                            Limpar notificações
                           </button>
                         </div>
                       )}
@@ -172,13 +177,22 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* User Menu */}
+              {/* Menu do usuário — apenas Meu Perfil e Sair */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-9 w-9 p-0 rounded-full">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white text-xs font-medium">
-                      {currentUser.name?.charAt(0)?.toUpperCase() || 'U'}
-                    </div>
+                    {avatarUrl ? (
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage src={avatarUrl} alt={displayName} />
+                        <AvatarFallback className="bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white text-xs font-medium">
+                          {displayName.charAt(0)?.toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white text-xs font-medium">
+                        {displayName.charAt(0)?.toUpperCase() || 'U'}
+                      </div>
+                    )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-slate-900 border-slate-700 text-white" align="end">
@@ -187,7 +201,7 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
                   </div>
                   <DropdownMenuItem onClick={onProfile} className="cursor-pointer text-slate-300 focus:text-white focus:bg-slate-800">
                     <User className="w-4 h-4 mr-2" />
-                    Perfil
+                    Meu Perfil
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={logout} className="cursor-pointer text-red-400 focus:text-red-400 focus:bg-slate-800">
                     <LogOut className="w-4 h-4 mr-2" />
