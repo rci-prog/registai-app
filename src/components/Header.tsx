@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogOut, User, UserPlus, Bell } from 'lucide-react';
+import { LogOut, Shield, User, UserPlus, Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import type { AppNotification } from '@/hooks/useNotifications';
@@ -16,7 +16,7 @@ interface HeaderProps {
 }
 
 export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
-  const { currentUser, theme, logout } = useAuth();
+  const { currentUser, isAdmin, theme, logout } = useAuth();
   const [notifOpen, setNotifOpen] = useState(false);
   const [detailNotif, setDetailNotif] = useState<AppNotification | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -68,6 +68,20 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
             <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Catalogo Inteligente de IA</p>
           </div>
         </div>
+
+        {/* CENTRO — Botao Painel ADM (mantido apenas para admins) */}
+        {isAdmin && (
+          <div className="absolute left-1/2 -translate-x-1/2 hidden sm:block">
+            <Button
+              size="sm"
+              onClick={onAdmin}
+              className="bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80 hover:from-violet-600 hover:to-fuchsia-600 text-white text-xs px-3 py-1 h-8 border border-violet-500/30"
+            >
+              <Shield className="w-3.5 h-3.5 mr-1.5" />
+              Painel ADM
+            </Button>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex items-center gap-2">
