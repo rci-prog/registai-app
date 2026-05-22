@@ -29,7 +29,7 @@ const MAX_BASE64_SIZE = 500 * 1024;
 export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, onDeleteAccount }: ProfileModalProps) {
   const [fullName, setFullName] = useState(profile?.name || '');
   const [username, setUsername] = useState(profile?.username || '');
-n  const [avatarDataUrl, setAvatarDataUrl] = useState(profile?.avatar || '');
+  const [avatarDataUrl, setAvatarDataUrl] = useState(profile?.avatar || '');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -124,7 +124,7 @@ n  const [avatarDataUrl, setAvatarDataUrl] = useState(profile?.avatar || '');
       if (result.success) { setShowDeleteConfirm(false); onClose(); } else { setDeleteError(result.message); }
     } catch (e: any) { setDeleteError(e.message || 'Erro.'); }
     finally { setIsDeleting(false); }
-n  };
+   };
 
   if (!profile) return null;
 
