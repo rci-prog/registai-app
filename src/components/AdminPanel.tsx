@@ -100,6 +100,11 @@ function isAdminEmail(email?: string): boolean {
   return !!email && adminEmails.includes(email);
 }
 
+// Verifica se o avatar e um base64 valido (nao URL do Storage bloqueada por AdBlock)
+function isValidAvatarUrl(url?: string): boolean {
+  return !!url && url.startsWith('data:image/');
+}
+
 async function fetchWithTimeout(url: string, options: RequestInit, timeout = 10000): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
@@ -386,7 +391,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
       console.log('[Admin][handleCreateAd] Resposta:', data);
       setAds(prev => [data?.[0] || body, ...prev]);
       setAdMsg('✅ Publicacao criada com sucesso!');
-      setNewAdTitle(''); setNewAdDescription(''); setNewAdTargetUrl(''); setNewAdImageUrl('');
+      setNewAdTitle(''); setNewAdTargetUrl(''); setNewAdImageUrl('');
       setNewAdExpiresAt(''); setNewAdIndeterminate(true);
       setNewAdOwnerEmail('');
       setShowAdModal(false);
@@ -466,7 +471,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
 
   // ============================================================
   // FETCH URL PREVIEW (og:title + og:image via proxy CORS)
-  // Fallback: Screenshot 11ty (alta qualidade, formato OpenGraph)
+  // Fallback garantido: Google Favicon (100% confiavel)
   // ============================================================
   const fetchUrlPreview = async () => {
     if (!newAdTargetUrl.trim()) return;
@@ -657,9 +662,17 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                   className="flex items-center justify-between p-3 rounded-lg bg-slate-800 border border-slate-700"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-violet-600 flex items-center justify-center text-white text-xs font-bold">
-                      {user.name?.charAt(0)?.toUpperCase() || 'U'}
-                    </div>
+                    {isValidAvatarUrl(user.avatar) ? (
+                      <div
+                        className="h-8 w-8 rounded-full bg-slate-700 flex-shrink-0 bg-cover bg-center border border-slate-600"
+                        style={{ backgroundImage: `url(${user.avatar})` }}
+                        title={`Foto de ${user.name}`}
+                      />
+                    ) : (
+                      <div className="h-8 w-8 rounded-full bg-violet-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                        {user.name?.charAt(0)?.toUpperCase() || 'U'}
+                      </div>
+                    )}
                     <div>
                       <div className="text-sm font-medium text-white">{user.name}</div>
                       <div className="text-xs text-slate-400">{user.email}</div>
@@ -699,7 +712,8 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
             </div>
           )}
         </div>
-                {/* Trending News Ads Section */}
+
+        {/* Trending News Ads Section */}
         <div className="space-y-3 border-t border-slate-700 pt-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white flex items-center gap-2">
