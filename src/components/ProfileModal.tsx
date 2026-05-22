@@ -86,15 +86,30 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
         return;
       }
 
-      // 2. Obter URL pública
-      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      const publicUrl = urlData?.publicUrl;
+      // 2. Obter URL assinada (funciona mesmo com bucket privado)
+      const { data: signedData, error: signedError } = await supabase.storage
+        .from('avatars')
+        .createSignedUrl(filePath, 60 * 60 * 24 * 365); // válida por 1 ano
 
-      if (!publicUrl) {
-        setSaveError('Erro ao gerar URL da imagem.');
+      if (signedError || !signedData?.signedUrl) {
+        console.error('[Avatar] Erro signed URL:', signedError?.message);
+        // Fallback: tentar URL pública
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+        const publicUrl = urlData?.publicUrl;
+        if (!publicUrl) {
+          setSaveError('Erro ao gerar URL da imagem.');
+          setIsUploading(false);
+          return;
+        }
+        setAvatarUrl(publicUrl);
+        await onUpdate({ avatar: publicUrl });
+        setSaveSuccess('Foto atualizada!');
         setIsUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
+
+      const publicUrl = signedData.signedUrl;
 
       // 3. Atualizar estado local (feedback visual imediato)
       setAvatarUrl(publicUrl);
@@ -149,7 +164,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
     setDeleteError(null);
     try {
       const result = await onDeleteAccount();
-       if (result.success) {
+      if (result.success) {
         setShowDeleteConfirm(false);
         onClose();
       } else {
@@ -174,7 +189,7 @@ export function ProfileModal({ open, onClose, profile, theme: _theme, onUpdate, 
           <DialogDescription className="text-slate-400">
             Gerencie suas informações de perfil.
           </DialogDescription>
-n        </DialogHeader>
+        </DialogHeader>
 
         <div className="space-y-4 pt-4">
           {/* Avatar com upload clicável */}
