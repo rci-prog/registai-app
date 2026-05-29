@@ -5,6 +5,7 @@ import { ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PublishRequestModal } from '@/components/PublishRequestModal';
 import { useAdClicks } from '@/hooks/useAdClicks';
+import { useAuth } from '@/contexts/AuthContext';
 
 import 'swiper/css';
 import 'swiper/css/navigation';
@@ -51,6 +52,10 @@ function getFallbackImage(index: number): string {
   return FALLBACK_IMAGES[index % FALLBACK_IMAGES.length];
 }
 
+// ============================================================
+// FETCH ADS ATIVAS via Supabase client (autenticado, com JWT)
+// Filtra apenas ads nao expiradas: expires_at IS NULL OR > now()
+// ============================================================
 async function fetchActiveAds(): Promise<TrendingAd[]> {
   try {
     const now = new Date().toISOString();
@@ -66,16 +71,18 @@ async function fetchActiveAds(): Promise<TrendingAd[]> {
       return [];
     }
 
+    // Auto-delete ads que expiraram (status ainda active mas expirou)
+    // Isso limpa ads antigas que o admin nao removeu manualmente
     const expiredAds = (data || []).filter((ad: any) => ad.expires_at && new Date(ad.expires_at) <= new Date(now));
     if (expiredAds.length > 0) {
-      console.log('[NewsCarousel] [Ads] Auto-delete ads expiradas:', expiredAds.length);
+      console.log('[NewsCarousel] [Ads] 🧹 Auto-delete ads expiradas:', expiredAds.length);
       for (const ad of expiredAds) {
         supabase.from('trending_ads').delete().eq('id', ad.id).then(() => {});
       }
     }
 
     const validAds = (data || []).filter((ad: any) => !ad.expires_at || new Date(ad.expires_at) > new Date(now));
-    console.log('[NewsCarousel] [Ads] Ativas (nao expiradas):', validAds.length);
+    console.log('[NewsCarousel] [Ads] ✅ Ativas (nao expiradas):', validAds.length);
     return validAds as TrendingAd[];
   } catch (e) {
     console.error('[NewsCarousel] [Ads] Excecao:', e);
@@ -83,6 +90,9 @@ async function fetchActiveAds(): Promise<TrendingAd[]> {
   }
 }
 
+// ============================================================
+// MESCLAR ADS + NOTICIAS (distribui ads aleatoriamente)
+// ============================================================
 function mergeNewsAndAds(newsItems: NewsItem[], ads: TrendingAd[]): NewsItem[] {
   if (!ads || ads.length === 0) return newsItems;
 
@@ -96,6 +106,7 @@ function mergeNewsAndAds(newsItems: NewsItem[], ads: TrendingAd[]): NewsItem[] {
     adId: ad.id,
   }));
 
+  // Mesclar: coloca 1 ad a cada ~4 noticias
   const merged: NewsItem[] = [];
   let adIndex = 0;
   const interval = 4;
@@ -107,6 +118,7 @@ function mergeNewsAndAds(newsItems: NewsItem[], ads: TrendingAd[]): NewsItem[] {
     }
   }
 
+  // Se sobraram ads, coloca no final
   while (adIndex < adItems.length) {
     merged.push(adItems[adIndex++]);
   }
@@ -115,19 +127,25 @@ function mergeNewsAndAds(newsItems: NewsItem[], ads: TrendingAd[]): NewsItem[] {
 }
 
 export function NewsCarousel({ theme }: NewsCarouselProps) {
+  console.log('[NewsCarousel] RENDER');
   const [news, setNews] = useState<NewsItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const { recordClick } = useAdClicks();
+  const { currentUser } = useAuth();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMounted = useRef(true);
   const swiperRef = useRef<any>(null);
 
+  // Fetch news - memoizado para nao recriar
   const fetchNews = useCallback(async () => {
     console.log('[NewsCarousel] Fetching news via rss2json...');
 
     try {
+      // ============================================================
+      // CACHE BUSTING: timestamp na URL para evitar cache
+      // ============================================================
       const cacheBuster = `&_t=${Date.now()}`;
       const response = await fetch(`${RSS2JSON_URL}${encodeURIComponent(RSS_URL)}${cacheBuster}`, {
         method: 'GET',
@@ -159,6 +177,9 @@ export function NewsCarousel({ theme }: NewsCarouselProps) {
 
       console.log(`[NewsCarousel] Parsed ${parsedNews.length} news items`);
 
+      // ============================================================
+      // BUSCAR ADS ATIVAS E MESCLAR
+      // ============================================================
       const activeAds = await fetchActiveAds();
       const merged = mergeNewsAndAds(parsedNews, activeAds);
       console.log(`[NewsCarousel] Mesclado: ${merged.length} itens (${parsedNews.length} news + ${activeAds.length} ads)`);
@@ -184,22 +205,30 @@ export function NewsCarousel({ theme }: NewsCarouselProps) {
     }
   }, []);
 
+  // useEffect com array VAZIO - roda apenas no mount
   useEffect(() => {
     isMounted.current = true;
+
+    // Fetch inicial
     fetchNews();
 
+    // Auto-refresh a cada 5 minutos
     intervalRef.current = setInterval(() => {
       console.log('[NewsCarousel] Auto-refresh triggered (5min)');
       fetchNews();
     }, 300000);
 
+    // ============================================================
+    // SUPABASE REALTIME: detecta mudanças na tabela trending_ads
+    // Fallback: se o Realtime falhar, o polling de 30s cobre
+    // ============================================================
     const realtimeChannel = supabase
       .channel('trending_ads_changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'trending_ads' },
         (payload: any) => {
-          console.log('[NewsCarousel] [Realtime] Mudanca detectada:', payload.eventType, payload.new?.id || payload.old?.id);
+          console.log('[NewsCarousel] [Realtime] 🔔 Mudança detectada:', payload.eventType, payload.new?.id || payload.old?.id);
           if (isMounted.current) {
             fetchNews();
           }
@@ -207,11 +236,18 @@ export function NewsCarousel({ theme }: NewsCarouselProps) {
       )
       .subscribe((status: string) => {
         console.log('[NewsCarousel] [Realtime] Status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('[NewsCarousel] [Realtime] Conectado ao Realtime');
+        if (status === 'CHANNEL_ERROR') {
+          console.error('[NewsCarousel] [Realtime] ❌ Erro no canal Realtime');
+        } else if (status === 'CLOSED') {
+          console.warn('[NewsCarousel] [Realtime] ⚠️ Canal fechado');
+        } else if (status === 'SUBSCRIBED') {
+          console.log('[NewsCarousel] [Realtime] ✅ Conectado ao Realtime');
         }
       });
 
+    // ============================================================
+    // POLLING: atualiza ads a cada 30s (fallback do Realtime)
+    // ============================================================
     const adsPollRef = setInterval(() => {
       console.log('[NewsCarousel] [polling] Verificando ads (30s)...');
       if (isMounted.current) {
@@ -219,12 +255,18 @@ export function NewsCarousel({ theme }: NewsCarouselProps) {
       }
     }, 30000);
 
+    // ============================================================
+    // CUSTOM EVENT: notificação instantânea do mesmo browser
+    // ============================================================
     const handleAdsChanged = () => {
       console.log('[NewsCarousel] [event] trending-ads-changed recebido, refazendo fetch...');
       fetchNews();
     };
     window.addEventListener('trending-ads-changed', handleAdsChanged);
 
+    // ============================================================
+    // RECARREGAR QUANDO A ABA VOLTA AO FOCO
+    // ============================================================
     const handleVisibility = () => {
       if (!document.hidden) {
         console.log('[NewsCarousel] [visibility] Aba voltou ao foco, refazendo fetch...');
@@ -245,6 +287,7 @@ export function NewsCarousel({ theme }: NewsCarouselProps) {
     };
   }, [fetchNews]);
 
+  // Fallback silencioso
   if (hasError || (!isLoading && news.length === 0)) {
     return null;
   }
@@ -259,6 +302,7 @@ export function NewsCarousel({ theme }: NewsCarouselProps) {
       style={{ zIndex: 40 }}
     >
       <div className="px-6 py-4">
+        {/* Titulo fixo elegante */}
         <div className="flex items-center gap-2 mb-4">
           <span className="text-lg">🔥</span>
           <h3
@@ -268,6 +312,7 @@ export function NewsCarousel({ theme }: NewsCarouselProps) {
           >
             Trending News
           </h3>
+          {/* Botão circular PUB (20% menor que perfil h-10 = h-8) */}
           <button
             onClick={() => setPublishOpen(true)}
             className={`ml-1 h-8 w-8 rounded-full flex-shrink-0 flex items-center justify-center text-[9px] font-bold tracking-wider transition-all hover:scale-110 active:scale-95 ${
@@ -287,6 +332,7 @@ export function NewsCarousel({ theme }: NewsCarouselProps) {
         </div>
 
         {isLoading ? (
+          /* Skeleton loading */
           <div className="flex gap-4">
             {[1, 2, 3, 4].map((i) => (
               <div
@@ -298,6 +344,7 @@ export function NewsCarousel({ theme }: NewsCarouselProps) {
             ))}
           </div>
         ) : (
+          /* Swiper Carousel */
           <Swiper
             ref={swiperRef}
             modules={[Autoplay, Navigation, Pagination]}
@@ -333,6 +380,7 @@ export function NewsCarousel({ theme }: NewsCarouselProps) {
                       : 'bg-white/80 border-gray-200/50 hover:border-violet-300'
                   }`}
                 >
+                  {/* Image */}
                   <div className="relative h-28 overflow-hidden">
                     <img
                       src={item.image}
@@ -347,6 +395,7 @@ export function NewsCarousel({ theme }: NewsCarouselProps) {
                           : 'from-white/80 to-transparent'
                       }`}
                     />
+                    {/* External link icon */}
                     <div
                       className={`absolute top-2 right-2 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity ${
                         theme === 'dark' ? 'bg-slate-900/60' : 'bg-white/60'
@@ -360,6 +409,7 @@ export function NewsCarousel({ theme }: NewsCarouselProps) {
                     </div>
                   </div>
 
+                  {/* Content */}
                   <div className="p-3">
                     <h4
                       className={`text-sm font-medium line-clamp-2 leading-snug ${
@@ -429,7 +479,8 @@ export function NewsCarousel({ theme }: NewsCarouselProps) {
         }
       `}</style>
 
-      <PublishRequestModal open={publishOpen} onClose={() => setPublishOpen(false)} />
+      {/* Modal Publique seu Projeto */}
+      <PublishRequestModal open={publishOpen} onClose={() => setPublishOpen(false)} userEmail={currentUser?.email} />
     </div>
   );
 }
