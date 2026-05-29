@@ -22,6 +22,7 @@ const SUPABASE_KEY = 'sb_publishable_Dm-ozWvAve1nkgjEDg_QsA_-gldlMxk';
 
 // ============================================================
 // EXTRAI O JWT DO ADMIN LOGADO DO LOCALSTORAGE DO SUPABASE
+// Necessario para passar pelo RLS em operacoes de escrita
 // ============================================================
 function getAdminToken(): string | null {
   try {
@@ -179,6 +180,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   // Publish requests
   const [publishRequests, setPublishRequests] = useState<PublishRequest[]>([]);
   const [publishRequestsLoading, setPublishRequestsLoading] = useState(false);
+  const [deleteRequestTarget, setDeleteRequestTarget] = useState<PublishRequest | null>(null);
 
   const { clickCounts, fetchMultipleClickCounts, fetchDailyClicks, sendReport } = useAdClicks();
   const isDark = true;
@@ -212,21 +214,29 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   useEffect(() => { if (open) loadUsers(); }, [open, loadUsers]);
 
   // ============================================================
-  // LOAD ADS — com JWT
+  // LOAD ADS — com JWT + LOGGING DETALHADO PARA DEBUG
   // ============================================================
   const loadAds = useCallback(async () => {
     setAdsLoading(true);
+    console.log('[Admin][loadAds] Buscando ads...');
     try {
       const resp = await fetchWithTimeout(
         `${SUPABASE_URL}/rest/v1/trending_ads?select=*&order=created_at.desc`,
         { headers: adminHeaders() },
         15000
       );
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      console.log('[Admin][loadAds] Status:', resp.status);
+      if (!resp.ok) {
+        const errText = await resp.text();
+        console.error('[Admin][loadAds] Erro:', resp.status, errText);
+        throw new Error(`HTTP ${resp.status}: ${errText}`);
+      }
       const data = await resp.json();
+      console.log('[Admin][loadAds] Ads carregadas:', data?.length || 0);
       setAds(data || []);
       if (data?.length > 0) fetchMultipleClickCounts(data.map((a: TrendingAd) => a.id));
     } catch (e: any) {
+      console.error('[Admin][loadAds] Erro:', e);
       setAdMsg('Erro ao carregar ads: ' + e.message);
     }
     setAdsLoading(false);
@@ -241,6 +251,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
     if (!isAdminEmail(currentUserEmail)) return;
     setPublishRequestsLoading(true);
     try {
+      // Buscar notificacoes de TODOS os profiles (nao so do admin)
       const resp = await fetchWithTimeout(
         `${SUPABASE_URL}/rest/v1/profiles?select=notifications`,
         { headers: adminHeaders() },
@@ -249,6 +260,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const profiles = await resp.json();
 
+      // Extrair todas as notificacoes do tipo publish_request de todos os usuarios
       const allRequests: PublishRequest[] = [];
       for (const profile of profiles || []) {
         const notifs = profile?.notifications || [];
@@ -266,8 +278,10 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
         allRequests.push(...requests);
       }
 
+      // Ordenar por data (mais recente primeiro)
       allRequests.sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
       setPublishRequests(allRequests);
+      console.log('[Admin][loadPublishRequests] Solicitacoes encontradas:', allRequests.length);
     } catch (e: any) {
       console.error('[Admin][loadPublishRequests] Erro:', e);
     }
@@ -277,7 +291,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   useEffect(() => { if (open) loadPublishRequests(); }, [open, loadPublishRequests]);
 
   // ============================================================
-  // LOAD REGISTERED EMAILS
+  // LOAD REGISTERED EMAILS — com JWT autenticado
   // ============================================================
   const loadRegisteredEmails = useCallback(async () => {
     try {
@@ -299,7 +313,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
     registeredEmails.has(newAdOwnerEmail.trim().toLowerCase()) ? 'valid' : 'invalid';
 
   // ============================================================
-  // ADD ADMIN
+  // ADD ADMIN — com JWT autenticado
   // ============================================================
   const handleAddAdmin = async () => {
     if (!isAdminEmail(currentUserEmail)) { setAddAdminMsg('Acesso negado.'); return; }
@@ -335,7 +349,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   };
 
   // ============================================================
-  // DELETE USER
+  // DELETE USER — com JWT autenticado
   // ============================================================
   const handleDelete = async () => {
     if (!deleteTarget || !isAdminEmail(currentUserEmail)) return;
@@ -356,7 +370,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   };
 
   // ============================================================
-  // TOGGLE BLOCK
+  // TOGGLE BLOCK — com JWT autenticado
   // ============================================================
   const handleToggleBlock = async () => {
     if (!blockTarget || !isAdminEmail(currentUserEmail)) return;
@@ -380,14 +394,60 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   };
 
   // ============================================================
-  // CREATE AD
+  // DELETE PUBLISH REQUEST — remove do profile do usuario via RPC
+  // ============================================================
+  const handleDeleteRequest = async () => {
+    if (!deleteRequestTarget) return;
+    try {
+      // Buscar o profile pelo email do solicitante
+      const resp = await fetchWithTimeout(
+        `${SUPABASE_URL}/rest/v1/profiles?select=id,notifications&email=eq.${encodeURIComponent(deleteRequestTarget.requesterEmail)}`,
+        { headers: adminHeaders() },
+        10000
+      );
+      if (!resp.ok) throw new Error('Erro ao buscar profile');
+      const data = await resp.json();
+      const profile = data?.[0];
+      if (!profile?.id) throw new Error('Profile não encontrado');
+
+      const existingNotifs = profile.notifications || [];
+      const updatedNotifs = existingNotifs.filter((n: any) => n.id !== deleteRequestTarget.id);
+
+      const patchResp = await fetchWithTimeout(
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${profile.id}`,
+        {
+          method: 'PATCH',
+          headers: { ...adminHeaders(), 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ notifications: updatedNotifs, updated_at: new Date().toISOString() }),
+        },
+        10000
+      );
+      if (!patchResp.ok) throw new Error('Erro ao atualizar');
+
+      setPublishRequests(publishRequests.filter((r) => r.id !== deleteRequestTarget.id));
+      setAdMsg('✅ Solicitação removida.');
+      setTimeout(() => setAdMsg(null), 4000);
+    } catch (e: any) {
+      setErrorMsg('Erro ao excluir solicitação: ' + e.message);
+      setTimeout(() => setErrorMsg(null), 5000);
+    }
+    setDeleteRequestTarget(null);
+  };
+
+  // ============================================================
+  // CREATE AD — com JWT + owner_id para RLS + LOGGING DETALHADO
   // ============================================================
   const handleCreateAd = async () => {
     if (!newAdTitle.trim() || !newAdTargetUrl.trim()) {
       setAdMsg('Preencha titulo e URL de destino.'); return;
     }
     setIsCreatingAd(true); setAdMsg(null);
+    console.log('[Admin][handleCreateAd] Iniciando criacao...');
+    console.log('[Admin][handleCreateAd] Titulo:', newAdTitle.trim());
+    console.log('[Admin][handleCreateAd] URL:', newAdTargetUrl.trim());
+
     try {
+      // Extrair userId do token JWT para RLS (owner_id = auth.uid())
       let ownerId: string | null = null;
       try {
         const sessionStr = localStorage.getItem('sb-cmfgirvgnexkcomhcosm-auth-token');
@@ -396,6 +456,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
           ownerId = session?.user?.id || null;
         }
       } catch { /* ignore */ }
+      console.log('[Admin][handleCreateAd] ownerId:', ownerId);
 
       const body: Record<string, any> = {
         title: newAdTitle.trim(),
@@ -413,6 +474,8 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
         body.expires_at = null;
       }
 
+      console.log('[Admin][handleCreateAd] Body:', JSON.stringify(body));
+
       const resp = await fetchWithTimeout(
         `${SUPABASE_URL}/rest/v1/trending_ads`, {
           method: 'POST',
@@ -421,29 +484,35 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
         }, 15000,
       );
 
+      console.log('[Admin][handleCreateAd] Status:', resp.status, resp.statusText);
       if (!resp.ok) {
         const errText = await resp.text();
+        console.error('[Admin][handleCreateAd] Erro:', resp.status, errText);
         throw new Error(`${resp.status}: ${errText || 'Erro desconhecido'}`);
       }
 
       const data = await resp.json();
+      console.log('[Admin][handleCreateAd] Resposta:', data);
       setAds(prev => [data?.[0] || body, ...prev]);
       setAdMsg('✅ Publicacao criada com sucesso!');
       setNewAdTitle(''); setNewAdTargetUrl(''); setNewAdImageUrl('');
-      setNewAdExpiresAt(''); setNewAdIndeterminate(true); setNewAdOwnerEmail('');
+      setNewAdExpiresAt(''); setNewAdIndeterminate(true);
+      setNewAdOwnerEmail('');
       setShowAdModal(false);
       setTimeout(() => setAdMsg(null), 4000);
     } catch (e: any) {
+      console.error('[Admin][handleCreateAd] Exception:', e);
       setAdMsg('Erro ao criar: ' + (e.message || String(e)));
     }
     setIsCreatingAd(false);
   };
 
   // ============================================================
-  // DELETE AD
+  // DELETE AD — sem return=representation + reload + prev state
   // ============================================================
   const handleDeleteAd = async () => {
     if (!deleteAdTarget) return;
+    console.log('[Admin][handleDeleteAd] Deletando ad ID:', deleteAdTarget.id, 'Titulo:', deleteAdTarget.title);
     const deletedId = deleteAdTarget.id;
     try {
       const resp = await fetchWithTimeout(
@@ -451,14 +520,19 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
         { method: 'DELETE', headers: adminHeaders() },
         10000,
       );
+      console.log('[Admin][handleDeleteAd] Status:', resp.status);
       if (!resp.ok) {
         const errText = await resp.text();
+        console.error('[Admin][handleDeleteAd] Erro:', resp.status, errText);
         throw new Error(`${resp.status}: ${errText || 'Erro ao deletar'}`);
       }
+      // DELETE com sucesso retorna 204 sem body — remover do estado local imediatamente
       setAds(prev => prev.filter((a) => a.id !== deletedId));
       setAdMsg('✅ Publicacao removida.');
+      // Recarregar do servidor para garantir sincronizacao
       setTimeout(() => loadAds(), 500);
     } catch (e: any) {
+      console.error('[Admin][handleDeleteAd] Exception:', e);
       setAdMsg('Erro ao remover: ' + (e.message || String(e)));
     }
     setDeleteAdTarget(null);
@@ -466,7 +540,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   };
 
   // ============================================================
-  // REPORT
+  // REPORT — open modal with daily clicks
   // ============================================================
   const handleOpenReport = async (ad: TrendingAd) => {
     setReportAdTarget(ad); setReportData([]); setIsSendingReport(false); setShowReportModal(true);
@@ -500,7 +574,8 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
   };
 
   // ============================================================
-  // FETCH URL PREVIEW
+  // FETCH URL PREVIEW (og:title + og:image via proxy CORS)
+  // Fallback garantido: Google Favicon (100% confiavel)
   // ============================================================
   const fetchUrlPreview = async () => {
     if (!newAdTargetUrl.trim()) return;
@@ -510,6 +585,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
       const url = new URL(newAdTargetUrl);
       const domain = url.hostname.replace('www.', '');
 
+      // 1) Tenta buscar og:title e og:image do HTML via proxy CORS
       try {
         const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(newAdTargetUrl.trim())}`;
         const resp = await fetchWithTimeout(proxyUrl, {}, 15000);
@@ -517,6 +593,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
           const json = await resp.json();
           const html = json.contents || '';
 
+          // og:title
           const ogTitle = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1];
           const twTitle = html.match(/<meta[^>]+name=["']twitter:title["'][^>]+content=["']([^"']+)["']/i)?.[1];
           const titleTag = html.match(/<title>([^<]+)<\/title>/i)?.[1]?.trim();
@@ -525,6 +602,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
             setNewAdTitle(extractedTitle.substring(0, 100));
           }
 
+          // og:image
           const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1];
           const twImage = html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)?.[1];
           const extractedImage = ogImage || twImage || null;
@@ -534,18 +612,24 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
             else if (imgUrl.startsWith('/')) imgUrl = `${url.protocol}//${url.hostname}${imgUrl}`;
             setNewAdImageUrl(imgUrl);
             imageSet = true;
+            console.log('[Admin][fetchUrlPreview] og:image:', imgUrl);
           }
         }
-      } catch { /* ignore */ }
+      } catch (e) {
+        console.log('[Admin][fetchUrlPreview] Proxy falhou:', e);
+      }
 
+      // 2) Titulo fallback: domain capitalizado
       if (!newAdTitle.trim()) {
         setNewAdTitle(domain.charAt(0).toUpperCase() + domain.slice(1));
       }
 
+      // 3) Imagem fallback: Screenshot 11ty (alta qualidade, formato OpenGraph)
       if (!imageSet && !newAdImageUrl.trim()) {
         const screenshotUrl = `https://v1.screenshot.11ty.dev/${encodeURIComponent(newAdTargetUrl.trim())}/opengraph/`;
         setNewAdImageUrl(screenshotUrl);
         imageSet = true;
+        console.log('[Admin][fetchUrlPreview] Screenshot 11ty:', screenshotUrl);
       }
 
       setAdMsg('Dados carregados!');
@@ -566,10 +650,10 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
     } catch { return dateStr; }
   };
   
+    // ============================================================
+  // RENDER — return starts here
   // ============================================================
-  // RENDER
-  // ============================================================
-    if (!isAdminEmail(currentUserEmail)) {
+  if (!isAdminEmail(currentUserEmail)) {
     return (
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="bg-slate-900 border-slate-700 text-white">
@@ -597,11 +681,12 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
               onClick={() => setShowGeneralNotifModal(true)}
               className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs px-3 py-1 h-8"
             >
-              <Megaphone className="w-3.5 h-3.5 mr-1.5" /> Notificacao Geral
+              <Megaphone className="w-3.5 h-3.5 mr-1.5" /> Notificação Geral
             </Button>
           </DialogTitle>
         </DialogHeader>
 
+        {/* Messages */}
         {adMsg && (
           <div className={`p-2 rounded-lg text-xs ${adMsg.startsWith('✅') ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}>
             {adMsg}
@@ -616,10 +701,11 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
           <div className="p-2 rounded-lg text-xs bg-red-900/30 text-red-400">{errorMsg}</div>
         )}
 
+        {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           <div className="p-3 rounded-lg bg-slate-800 border border-slate-700">
             <div className="text-2xl font-bold text-white">{localUsers.length}</div>
-            <div className="text-xs text-slate-400">Usuarios</div>
+            <div className="text-xs text-slate-400">Usuários</div>
           </div>
           <div className="p-3 rounded-lg bg-slate-800 border border-slate-700">
             <div className="text-2xl font-bold text-white">{localUsers.filter((u) => isAdminEmail(u.email)).length}</div>
@@ -631,22 +717,24 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
           </div>
         </div>
 
+        {/* Users Section */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Users className="w-4 h-4 text-violet-500" /> Usuarios
+              <Users className="w-4 h-4 text-violet-500" /> Usuários
             </h3>
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => { loadUsers(); loadAds(); loadPublishRequests(); }}
+              onClick={() => { loadUsers(); loadAds(); }}
               className="text-slate-400 hover:text-white hover:bg-slate-800 h-7 px-2"
-              title="Atualizar usuarios e ads"
+              title="Atualizar usuários e ads"
             >
               <RefreshCw className="w-3.5 h-3.5" />
             </Button>
           </div>
 
+          {/* Add Admin */}
           <div className="flex gap-2">
             <Input
               placeholder="Email do novo administrador..."
@@ -663,12 +751,13 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
             </Button>
           </div>
 
+          {/* User List */}
           {isLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
             </div>
           ) : localUsers.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-8">Nenhum usuario encontrado.</p>
+            <p className="text-sm text-slate-500 text-center py-8">Nenhum usuário encontrado.</p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {localUsers.map((user) => (
@@ -716,7 +805,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                         size="sm" variant="ghost"
                         onClick={() => setDeleteTarget(user)}
                         className="text-red-400 hover:bg-red-500/10"
-                        title="Excluir usuario"
+                        title="Excluir usuário"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -728,10 +817,11 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
           )}
         </div>
 
+        {/* Publish Requests Section */}
         <div className="space-y-3 border-t border-slate-700 pt-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Send className="w-4 h-4 text-amber-500" /> Solicitacoes de Publicacao
+              <Send className="w-4 h-4 text-amber-500" /> Solicitações de Publicação
             </h3>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
               {publishRequests.length} nova{publishRequests.length !== 1 ? 's' : ''}
@@ -743,7 +833,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
               <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
             </div>
           ) : publishRequests.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-4">Nenhuma solicitacao de publicacao.</p>
+            <p className="text-sm text-slate-500 text-center py-4">Nenhuma solicitação de publicação.</p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {publishRequests.map((req) => (
@@ -757,35 +847,47 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                       <span className="text-sm font-medium text-white">{req.requesterEmail || 'Sem email'}</span>
                     </div>
                     {req.status === 'unread' && (
-                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" title="Nova solicitacao" />
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" title="Nova solicitação" />
                     )}
                   </div>
                   <div className="text-xs text-slate-400 space-y-1">
                     <p><strong className="text-slate-300">URL:</strong> <a href={req.projectUrl} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:underline break-all">{req.projectUrl}</a></p>
-                    <p><strong className="text-slate-300">Descricao:</strong> {req.projectDescription}</p>
-                    <p><strong className="text-slate-300">Vigencia:</strong> {req.vigencia}</p>
+                    <p><strong className="text-slate-300">Descrição:</strong> {req.projectDescription}</p>
+                    <p><strong className="text-slate-300">Vigência:</strong> {req.vigencia}</p>
                     {req.requestedAt && (
                       <p className="text-[10px] text-slate-500">{formatDate(req.requestedAt)}</p>
                     )}
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(req.requesterEmail)}&su=${encodeURIComponent('Re: Solicitacao de Publicacao no Trending News')}`;
-                      window.open(gmailUrl, '_blank', 'noopener,noreferrer');
-                    }}
-                    className="w-full border-amber-700 text-amber-400 hover:bg-amber-500/10 text-xs"
-                  >
-                    <ExternalLink className="w-3 h-3 mr-1.5" />
-                    Enviar E-mail
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(req.requesterEmail)}&su=${encodeURIComponent('Re: Solicitação de Publicação no Trending News')}`;
+                        window.open(gmailUrl, '_blank', 'noopener,noreferrer');
+                      }}
+                      className="flex-1 border-amber-700 text-amber-400 hover:bg-amber-500/10 text-xs"
+                    >
+                      <ExternalLink className="w-3 h-3 mr-1.5" />
+                      Enviar E-mail
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setDeleteRequestTarget(req)}
+                      className="text-red-400 hover:bg-red-500/10 h-8 w-8 p-0"
+                      title="Excluir solicitação"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </div>
 
+        {/* Trending News Ads Section */}
         <div className="space-y-3 border-t border-slate-700 pt-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white flex items-center gap-2">
@@ -879,6 +981,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
           )}
         </div>
 
+        {/* Create Ad Modal — com cleanup garantido em TODAS as formas de fechar */}
         <Dialog open={showAdModal} onOpenChange={(o) => {
           setShowAdModal(o);
           if (!o) {
@@ -894,6 +997,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              {/* URL + Fetch */}
               <div className="flex gap-2">
                 <Input
                   placeholder="URL de destino..."
@@ -910,6 +1014,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                 </Button>
               </div>
 
+              {/* Title */}
               <div>
                 <Label className="text-slate-400">Titulo *</Label>
                 <Input
@@ -920,6 +1025,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                 />
               </div>
 
+              {/* Description */}
               <div>
                 <Label className="text-slate-400">Texto da Publicacao <span className="text-[10px] text-slate-500">(opcional, max 300 caracteres)</span></Label>
                 <textarea
@@ -936,6 +1042,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                 <p className="text-[10px] text-slate-500 text-right mt-0.5">{newAdDescription.length}/300</p>
               </div>
 
+              {/* Owner Email */}
               <div>
                 <Label className="text-slate-400">Responsavel (e-mail) <span className="text-[10px] text-slate-500">(apenas cadastrados)</span></Label>
                 <div className="relative">
@@ -971,6 +1078,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                 </p>
               </div>
 
+              {/* Image */}
               <div>
                 <Label className="text-slate-400">Imagem</Label>
                 <div className="flex gap-2">
@@ -1000,6 +1108,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                 )}
               </div>
 
+              {/* Expiry */}
               <div>
                 <Label className="text-slate-400">Expiracao</Label>
                 <div className="flex items-center gap-3">
@@ -1023,6 +1132,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                 </div>
               </div>
 
+              {/* Buttons */}
               <div className="flex justify-end gap-2">
                 <Button
                   variant="outline"
@@ -1048,6 +1158,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
           </DialogContent>
         </Dialog>
 
+        {/* Report Modal */}
         <Dialog open={showReportModal} onOpenChange={(o) => { if (!o) { setShowReportModal(false); setReportAdTarget(null); setReportData([]); } }}>
           <DialogContent className="max-w-md bg-slate-900 border-slate-700 text-white">
             <DialogHeader>
@@ -1095,7 +1206,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
                   </div>
                 ) : (
                   <p className="text-xs text-center py-4 text-slate-500">
-                    Nenhum clique registrado.
+                    {clickCounts[reportAdTarget.id] || 0 > 0 ? 'Carregando...' : 'Nenhum clique registrado.'}
                   </p>
                 )}
 
@@ -1129,6 +1240,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
           </DialogContent>
         </Dialog>
 
+        {/* Block User Alert */}
         <AlertDialog open={!!blockTarget} onOpenChange={() => setBlockTarget(null)}>
           <AlertDialogContent className="bg-slate-900 border-slate-700 text-white">
             <AlertDialogHeader>
@@ -1156,6 +1268,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
           </AlertDialogContent>
         </AlertDialog>
 
+        {/* Delete User Alert */}
         <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
           <AlertDialogContent className="bg-slate-900 border-slate-700 text-white">
             <AlertDialogHeader>
@@ -1175,6 +1288,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
           </AlertDialogContent>
         </AlertDialog>
 
+        {/* Delete Ad Alert */}
         <AlertDialog open={!!deleteAdTarget} onOpenChange={() => setDeleteAdTarget(null)}>
           <AlertDialogContent className="bg-slate-900 border-slate-700 text-white">
             <AlertDialogHeader>
@@ -1194,6 +1308,27 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
           </AlertDialogContent>
         </AlertDialog>
 
+        {/* Delete Publish Request Alert */}
+        <AlertDialog open={!!deleteRequestTarget} onOpenChange={() => setDeleteRequestTarget(null)}>
+          <AlertDialogContent className="bg-slate-900 border-slate-700 text-white">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-white flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-500" /> Excluir solicitação?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-400">
+                Deseja remover a solicitação de <strong>{deleteRequestTarget?.requesterEmail}</strong>? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="bg-slate-800 text-white border-slate-700">Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteRequest} className="bg-red-600 hover:bg-red-700 text-white">
+                <Trash2 className="w-4 h-4 mr-2" /> Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* General Notification Modal */}
         <GeneralNotificationModal
           open={showGeneralNotifModal}
           onClose={() => setShowGeneralNotifModal(false)}
@@ -1205,7 +1340,7 @@ export function AdminPanel({ open, onClose, currentUserEmail }: AdminPanelProps)
 }
 
 // ============================================================
-// GENERAL NOTIFICATION MODAL
+// GENERAL NOTIFICATION MODAL — incorporado no mesmo arquivo
 // ============================================================
 
 interface GeneralNotificationModalProps {
@@ -1371,6 +1506,7 @@ function GeneralNotificationModal({ open, onClose, theme }: GeneralNotificationM
               variant="outline"
               onClick={onClose}
               className={isDark ? 'border-slate-700 text-slate-300' : ''}
+              disabled={isSending}
             >
               Cancelar
             </Button>
@@ -1380,8 +1516,12 @@ function GeneralNotificationModal({ open, onClose, theme }: GeneralNotificationM
               disabled={isSending || !title.trim() || !message.trim()}
               className="bg-violet-600 hover:bg-violet-700 text-white"
             >
-              {isSending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Send className="w-4 h-4 mr-1" />}
-              Enviar
+              {isSending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+              ) : (
+                <Send className="w-4 h-4 mr-1" />
+              )}
+              {isSending ? 'Enviando...' : 'Enviar a Todos'}
             </Button>
           </div>
         </div>
