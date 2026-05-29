@@ -16,6 +16,7 @@ import {
   Mail,
 } from 'lucide-react';
 import { PublishRequestModal } from '@/components/PublishRequestModal';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
   DialogContent,
@@ -111,6 +112,7 @@ export function ProjectArchiver({ projects, tools, theme, onAdd, onDelete }: Pro
   const [shareExpandedUrl, setShareExpandedUrl] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
+  const { currentUser } = useAuth();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -184,7 +186,7 @@ export function ProjectArchiver({ projects, tools, theme, onAdd, onDelete }: Pro
     }
   };
 
-    const safeProjects = Array.isArray(projects) ? projects : []; // BLINDAGEM
+  const safeProjects = Array.isArray(projects) ? projects : [];
   const groupedProjects = safeProjects.reduce((acc, project) => {
     if (!acc[project.type]) acc[project.type] = [];
     acc[project.type].push(project);
@@ -722,7 +724,7 @@ export function ProjectArchiver({ projects, tools, theme, onAdd, onDelete }: Pro
       </Dialog>
 
       {/* Modal Publique seu Projeto */}
-      <PublishRequestModal open={publishOpen} onClose={() => setPublishOpen(false)} />
+      <PublishRequestModal open={publishOpen} onClose={() => setPublishOpen(false)} userEmail={currentUser?.email} />
     </>
   );
 }
