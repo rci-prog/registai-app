@@ -1,6 +1,6 @@
 export const SITE_CONFIG = {
   url: 'https://www.registai.com.br',
-  name: 'registAI',
+  name: 'RegistAI',
   tagline: 'Inteligencia Artificial aplicada ao Compliance e Automacao',
   location: 'Belo Horizonte, MG',
   country: 'Brasil',
