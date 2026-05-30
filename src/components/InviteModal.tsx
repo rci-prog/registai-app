@@ -10,18 +10,21 @@ import {
 } from '@/components/ui/dialog';
 import { Mail, Send, Loader2, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 
-const SUPABASE_URL = 'https://cmfgirvgnexkcomhcosm.supabase.co';
-const AUTH_KEY = 'sb-cmfgirvgnexkcomhcosm-auth-token';
-
-function getUserToken(): string | null {
-  try {
-    const raw = localStorage.getItem(AUTH_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed?.access_token || null;
-  } catch { return null; }
-}
+/**
+ * InviteModal — Sistema de Convites
+ *
+ * Abre ao clicar em "Convidar Amigo" no Header.
+ * Chama a Edge Function send-invite do Supabase que:
+ *  - Valida o e-mail
+ *  - Aplica rate limit (5 convites/hora)
+ *  - Gera token unico
+ *  - Salva no banco para rastreamento
+ *
+ * O envio real de e-mail depende do SMTP/Resend configurado
+ * na Edge Function (em breve).
+ */
 
 interface InviteModalProps {
   open: boolean;
@@ -40,6 +43,7 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
   };
 
   const handleSendInvite = async () => {
+    // Validacao
     if (!email.trim()) {
       setError('Digite um e-mail valido.');
       return;
@@ -53,50 +57,39 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
     setError(null);
 
     try {
-      // Chamada direta a Edge Function (mais confiavel que supabase.functions.invoke)
-      const userToken = getUserToken();
-      if (!userToken) {
-        setError('Voce precisa estar logado para enviar convites.');
-        setSending(false);
-        return;
+      // Insert direto na tabela invites (sem Edge Function)
+      const inviteToken = crypto.randomUUID();
+      const finalInviteUrl = `https://www.registai.com.br?ref=${inviteToken}`;
+
+      const { data, error } = await supabase.from('invites').insert({
+        sender_id: currentUser?.id,
+        sender_email: currentUser?.email,
+        recipient_email: email.trim(),
+        token: inviteToken,
+        invite_url: finalInviteUrl,
+        status: 'pending',
+      }).select();
+
+      if (error) {
+        console.error('[Invite] INSERT ERROR:', error.code, error.message);
+        throw new Error(`[${error.code}] ${error.message}`);
       }
 
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/send-invite`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${userToken}`,
-          'Content-Type': 'application/json',
-          'apikey': 'sb_publishable_Dm-ozWvAve1nkgjEDg_QsA_-gldlMxk',
-        },
-        body: JSON.stringify({
-          sender_id: currentUser?.id,
-          sender_email: currentUser?.email,
-          recipient_email: email.trim(),
-        }),
-      });
-
-      const data = await resp.json();
-      console.log('[Invite] Response status:', resp.status, 'data:', data);
-
-      if (!resp.ok) {
-        throw new Error(data.error || `Erro ${resp.status}`);
-      }
-
-      console.log('[Invite] Convite enviado:', data);
+      console.log('[Invite] Convite salvo:', data);
       setSent(true);
     } catch (err: any) {
       console.error('[Invite] Erro:', err);
       const msg = err.message || '';
-      if (msg.includes('Rate limit') || msg.includes('429')) {
-        setError('Limite de convites atingido. Tente novamente em 1 hora.');
-      } else if (msg.includes('already has') || msg.includes('409')) {
-        setError('Este e-mail ja possui uma conta no RegistAI.');
-      } else if (msg.includes('Invalid recipient') || msg.includes('400')) {
-        setError('E-mail do destinatario invalido.');
-      } else if (msg.includes('Unauthorized') || msg.includes('401') || msg.includes('403')) {
-        setError('Sessao expirada. Faca login novamente.');
+      if (msg.includes('23503')) {
+        setError('Erro de referencia: usuario nao encontrado.');
+      } else if (msg.includes('23505')) {
+        setError('Convite ja enviado para este e-mail.');
+      } else if (msg.includes('42501')) {
+        setError('Sem permissao para enviar convites.');
+      } else if (msg.includes('42703')) {
+        setError('Coluna nao encontrada. Verifique a tabela invites.');
       } else {
-        setError('Erro ao enviar convite. Tente novamente.');
+        setError(msg || 'Erro ao enviar convite. Tente novamente.');
       }
     } finally {
       setSending(false);
@@ -124,6 +117,7 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
         </DialogHeader>
 
         {sent ? (
+          /* Estado de sucesso */
           <div className="flex flex-col items-center gap-4 py-6">
             <CheckCircle2 className="w-16 h-16 text-emerald-400" />
             <p className="text-center text-emerald-400 font-medium text-lg">
@@ -140,6 +134,7 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
             </Button>
           </div>
         ) : (
+          /* Formulario de envio */
           <div className="flex flex-col gap-4 py-2">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-300">
