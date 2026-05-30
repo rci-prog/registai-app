@@ -42,36 +42,24 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
     setError(null);
 
     try {
-      const inviteToken = crypto.randomUUID();
-      const finalInviteUrl = `https://www.registai.com.br?ref=${inviteToken}`;
-
-      // Ajustado para os nomes das colunas reais da sua tabela: 
-      // id, sender_id, sender_email, recipient_email, token, invite_url, status, created_at
-      const { error: insertError } = await supabase.from('invites').insert([
-        {
+      // Chamada para a Edge Function 'send-invite'
+      const { data, error: functionError } = await supabase.functions.invoke('send-invite', {
+        body: { 
           sender_id: currentUser?.id,
           sender_email: currentUser?.email,
-          recipient_email: email.trim(),
-          token: inviteToken,
-          invite_url: finalInviteUrl,
-          status: 'pending',
-          created_at: new Date().toISOString()
-        }
-      ]);
+          recipient_email: email.trim() 
+        },
+      });
 
-      if (insertError) {
-        console.error('[Invite] INSERT ERROR:', insertError);
-        throw new Error(insertError.message);
+      if (functionError) {
+        console.error('[Invite] Function Error:', functionError);
+        throw new Error('Erro ao processar o convite.');
       }
 
       setSent(true);
     } catch (err: any) {
       console.error('[Invite] Erro:', err);
-      if (err.message?.includes('42501')) {
-        setError('Sem permissão para enviar convites.');
-      } else {
-        setError('Erro ao enviar convite. Tente novamente mais tarde.');
-      }
+      setError('Erro ao enviar convite. Tente novamente mais tarde.');
     } finally {
       setSending(false);
     }
