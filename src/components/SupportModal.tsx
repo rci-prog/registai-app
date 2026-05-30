@@ -40,7 +40,7 @@ export function SupportModal({ open, onClose }: SupportModalProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-white">
             <Mail className="w-5 h-5 text-violet-400" />
-            Suporte registAI
+            Suporte RegistAI
           </DialogTitle>
         </DialogHeader>
 
