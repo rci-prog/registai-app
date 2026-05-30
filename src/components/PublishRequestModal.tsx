@@ -99,6 +99,7 @@ export function PublishRequestModal({ open, onClose, userEmail = '' }: PublishRe
 
     const vigenciaLabel = VIGENCIA_OPTIONS.find(v => v.value === vigencia)?.label || vigencia;
 
+    // Buscar o usuário logado para obter o ID do profile
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user?.id) {
       setError('Você precisa estar logado para enviar uma solicitação.');
@@ -109,6 +110,7 @@ export function PublishRequestModal({ open, onClose, userEmail = '' }: PublishRe
     const userId = session.user.id;
     const email = userEmail || session.user.email || '';
 
+    // Buscar notificações existentes do próprio usuário
     const { data: profileData, error: fetchError } = await supabase
       .from('profiles')
       .select('notifications')
@@ -124,6 +126,7 @@ export function PublishRequestModal({ open, onClose, userEmail = '' }: PublishRe
 
     const existingNotifs: PublishRequestNotif[] = (profileData?.notifications as any[]) || [];
 
+    // Criar nova notificação de solicitação
     const newNotif: PublishRequestNotif = {
       id: `pubreq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       type: 'alert',
@@ -143,6 +146,7 @@ export function PublishRequestModal({ open, onClose, userEmail = '' }: PublishRe
 
     const updatedNotifs = [newNotif, ...existingNotifs].slice(0, 50);
 
+    // Salvar no próprio profile (funciona via RLS — usuário pode editar seu próprio profile)
     const { error: updateError } = await supabase
       .from('profiles')
       .update({ notifications: updatedNotifs, updated_at: new Date().toISOString() })
@@ -166,6 +170,7 @@ export function PublishRequestModal({ open, onClose, userEmail = '' }: PublishRe
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
       <DialogContent className="sm:max-w-md bg-slate-900 border-slate-700 text-white">
 
+        {/* ============ PASSO 1: CONFIRMAÇÃO ============ */}
         {step === 'confirm' && (
           <>
             <DialogHeader>
@@ -204,6 +209,7 @@ export function PublishRequestModal({ open, onClose, userEmail = '' }: PublishRe
           </>
         )}
 
+        {/* ============ PASSO 2: FORMULÁRIO ============ */}
         {step === 'form' && (
           <>
             <DialogHeader>
@@ -217,6 +223,7 @@ export function PublishRequestModal({ open, onClose, userEmail = '' }: PublishRe
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-4 py-2">
+              {/* E-mail (read-only) */}
               <div className="space-y-1.5">
                 <Label className="text-slate-300 text-sm">E-mail</Label>
                 <div className="relative">
@@ -231,6 +238,7 @@ export function PublishRequestModal({ open, onClose, userEmail = '' }: PublishRe
                 </div>
               </div>
 
+              {/* URL do projeto */}
               <div className="space-y-1.5">
                 <Label className="text-slate-300 text-sm">URL do projeto *</Label>
                 <Input
@@ -238,11 +246,14 @@ export function PublishRequestModal({ open, onClose, userEmail = '' }: PublishRe
                   placeholder="https://meuprojeto.com"
                   value={projectUrl}
                   onChange={(e) => setProjectUrl(e.target.value)}
+                  autoComplete="off"
+                  name="project-url"
                   required
                   className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus:border-violet-500"
                 />
               </div>
 
+              {/* Descrição do projeto */}
               <div className="space-y-1.5">
                 <Label className="text-slate-300 text-sm">Descrição do projeto *</Label>
                 <textarea
@@ -251,17 +262,20 @@ export function PublishRequestModal({ open, onClose, userEmail = '' }: PublishRe
                   placeholder="Descreva seu projeto em poucas palavras..."
                   rows={3}
                   maxLength={300}
+                  autoComplete="off"
                   required
                   className="w-full rounded-md border px-3 py-2 text-sm resize-none bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-violet-500 focus:border-transparent"
                 />
                 <p className="text-[10px] text-slate-500 text-right">{projectDescription.length}/300</p>
               </div>
 
+              {/* Vigência */}
               <div className="space-y-1.5">
                 <Label className="text-slate-300 text-sm">Vigência da publicação *</Label>
                 <select
                   value={vigencia}
                   onChange={(e) => setVigencia(e.target.value)}
+                  autoComplete="off"
                   required
                   className="w-full rounded-md border px-3 py-2.5 text-sm bg-slate-800 border-slate-700 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent"
                 >
@@ -272,6 +286,7 @@ export function PublishRequestModal({ open, onClose, userEmail = '' }: PublishRe
                 </select>
               </div>
 
+              {/* Info */}
               <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
                 <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-amber-400">
@@ -279,12 +294,14 @@ export function PublishRequestModal({ open, onClose, userEmail = '' }: PublishRe
                 </p>
               </div>
 
+              {/* Error */}
               {error && (
                 <div className="p-3 rounded-lg text-sm bg-red-900/30 text-red-400 border border-red-800">
                   {error}
                 </div>
               )}
 
+              {/* Buttons */}
               <div className="flex flex-col gap-2 pt-2">
                 <Button
                   type="submit"
@@ -308,6 +325,7 @@ export function PublishRequestModal({ open, onClose, userEmail = '' }: PublishRe
           </>
         )}
 
+        {/* ============ PASSO 3: SUCESSO ============ */}
         {step === 'success' && (
           <>
             <DialogHeader>
@@ -326,6 +344,7 @@ export function PublishRequestModal({ open, onClose, userEmail = '' }: PublishRe
                 A confirmação chegará no seu e-mail em até 48h, não esqueça de conferir na caixa de spam.
               </p>
 
+              {/* Resumo */}
               <div className="w-full text-left p-3 rounded-lg bg-slate-800 border border-slate-700 space-y-2">
                 <p className="text-xs text-slate-400"><strong className="text-slate-300">E-mail:</strong> {userEmail || 'Não informado'}</p>
                 <p className="text-xs text-slate-400"><strong className="text-slate-300">URL:</strong> {projectUrl}</p>
