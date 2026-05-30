@@ -333,7 +333,7 @@ export function Dashboard() {
           </svg>
           <div className="text-center">
             <h1 className="text-4xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-600 bg-clip-text text-transparent pb-1">
-              registAI
+              RegistAI
             </h1>
             <p className={`mt-2 text-base ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>
               Catálogo Inteligente de IA
@@ -383,7 +383,7 @@ export function Dashboard() {
             </div>
 
             <h2 className={`text-2xl font-bold text-center mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Bem-vindo ao registAI!
+              Bem-vindo ao RegistAI!
             </h2>
             <p className={`text-center text-sm mb-6 ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>
               Sua conta foi criada com sucesso via Google.
@@ -397,7 +397,7 @@ export function Dashboard() {
               <div className={`space-y-3 text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-gray-600'}`}>
                 <p>
                   <strong className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>1. Aceitação dos Termos</strong><br/>
-                  Ao utilizar o registAI, você concorda com estes termos de uso. A plataforma é um catálogo de ferramentas de inteligência artificial destinado a fins informativos e organizacionais.
+                  Ao utilizar o RegistAI, você concorda com estes termos de uso. A plataforma é um catálogo de ferramentas de inteligência artificial destinado a fins informativos e organizacionais.
                 </p>
                 <p>
                   <strong className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>2. Responsabilidade do Usuário</strong><br/>
@@ -405,7 +405,7 @@ export function Dashboard() {
                 </p>
                 <p>
                   <strong className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>3. Conteúdo e Ferramentas</strong><br/>
-                  As ferramentas listadas no catálogo são de responsabilidade de seus respectivos desenvolvedores. O registAI não se responsabiliza pelo funcionamento, precisão ou segurança das ferramentas de terceiros.
+                  As ferramentas listadas no catálogo são de responsabilidade de seus respectivos desenvolvedores. O RegistAI não se responsabiliza pelo funcionamento, precisão ou segurança das ferramentas de terceiros.
                 </p>
                 <p>
                   <strong className={theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}>4. Privacidade de Dados</strong><br/>
