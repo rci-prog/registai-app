@@ -31,12 +31,23 @@ interface InviteModalProps {
 export function InviteModal({ open, onClose }: InviteModalProps) {
   const { currentUser } = useAuth();
   const [email, setEmail] = useState('');
+  const [emailValid, setEmailValid] = useState<boolean | null>(null);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const validateEmail = (value: string): boolean => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+  };
+
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+    setError(null);
+    if (value.trim() === '') {
+      setEmailValid(null);
+    } else {
+      setEmailValid(validateEmail(value));
+    }
   };
 
   const handleSendInvite = async () => {
@@ -120,6 +131,7 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
 
   const handleClose = () => {
     setEmail('');
+    setEmailValid(null);
     setSent(false);
     setError(null);
     onClose();
@@ -164,11 +176,23 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
                 type="email"
                 placeholder="amigo@email.com"
                 value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(null); }}
-                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 focus:border-violet-500 focus:ring-violet-500/20"
+                onChange={(e) => handleEmailChange(e.target.value)}
+                className={`bg-slate-800 text-white placeholder:text-slate-500 transition-colors ${
+                  emailValid === null
+                    ? 'border-slate-600 focus:border-violet-500 focus:ring-violet-500/20'
+                    : emailValid
+                      ? 'border-emerald-500 focus:border-emerald-500 focus:ring-emerald-500/30'
+                      : 'border-red-500 focus:border-red-500 focus:ring-red-500/30'
+                }`}
                 onKeyDown={(e) => e.key === 'Enter' && handleSendInvite()}
                 disabled={sending}
               />
+              {emailValid === false && (
+                <p className="text-sm text-red-400">E-mail invalido.</p>
+              )}
+              {emailValid === true && (
+                <p className="text-sm text-emerald-400">E-mail valido.</p>
+              )}
               {error && (
                 <p className="text-sm text-red-400">{error}</p>
               )}
