@@ -29,7 +29,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   loginWithGoogle: () => Promise<{ success: boolean; message: string }>;
-  register: (email: string, password: string, name: string) => Promise<{ success: boolean; message: string; isDeletedAccountWithNewPassword?: boolean }>;
+  register: (email: string, password: string, name: string) => Promise<{ success: boolean; message: string }>;
   resetPassword: (email: string) => Promise<{ success: boolean; message: string }>;
   addUser: (email: string, role: string) => Promise<{ success: boolean; message: string }>;
   deleteUser: (id: string) => Promise<{ success: boolean; message: string }>;
@@ -97,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
 
       console.log('[Auth] [autoProvision] Upsert profile para Google OAuth:', email);
+      // UPSERT: insere se não existe, atualiza se existe (evita erro 409)
       const { error } = await supabase
         .from('profiles')
         .upsert(profilePayload, { onConflict: 'id', ignoreDuplicates: false });
@@ -144,7 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: profileData, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
       console.log('[Auth] [fetchProfile] userId:', userId, 'found:', !!profileData, 'error:', error?.message);
       if (error || !profileData) {
-        console.log('[Auth] [fetchProfile] Profile nao encontrado. Criando automaticamente...');
+        console.log('[Auth] [fetchProfile] Profile não encontrado. Criando automaticamente...');
         const cachedUser = getAuth();
         if (cachedUser?.id === userId) {
           const isAdminUser = cachedUser.email === ADMIN_EMAIL;
@@ -262,7 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchProfile, checkUserBlocked]);
 
-    // REGISTER — Versão definitiva e ultra-limpa (O Trigger SQL cuida de criar o profile no banco)
+  // REGISTER — cadastro limpo e padrão (trigger SQL cuida da limpeza de contas deletadas)
   const register = useCallback(async (email: string, password: string, name: string): Promise<{ success: boolean; message: string }> => {
     try {
       console.log('[Auth] [register] Iniciando cadastro:', email);
@@ -271,7 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         options: {
-          data: { full_name: name }, // Passa o nome nos metadados para o Trigger do banco ler
+          data: { full_name: name },
           emailRedirectTo: 'https://www.registai.com.br',
         },
       });
@@ -290,42 +291,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, message: signUpError.message };
       }
 
+      // Sucesso: criar profile
       if (signUpData?.user) {
-        // Checa se o usuário já veio com o e-mail confirmado (isso acontece no OAuth/Google)
-        const isEmailConfirmed = !!signUpData.user.email_confirmed_at;
         const isAdminUser = email === ADMIN_EMAIL;
-
-        if (isEmailConfirmed) {
-          // 🟢 FLUXO GOOGLE / CONTA JÁ ATIVA:
-          // Salva os estados locais imediatamente para liberar o login e a tela de termos
-          const user: User = {
-            id: signUpData.user.id,
-            email,
-            name,
-            avatar: '',
-            role: isAdminUser ? 'admin' : 'user',
-            createdAt: new Date(signUpData.user.created_at || Date.now()),
-          };
-
-          setCurrentUser(user);
-          saveAuth(user);
-          setProfile({
-            id: signUpData.user.id, email, name, avatar: '',
-            role: isAdminUser ? 'admin' : 'user', theme: 'dark',
-          });
-
-          console.log('[Auth] [register] ✅ Login via Provedor Ativo (Google) concluído localmente.');
-          return { success: true, isOAuth: true };
+        const newProfile = {
+          id: signUpData.user.id,
+          email,
+          full_name: name,
+          avatar_url: '',
+          role: isAdminUser ? 'admin' : 'user',
+          theme: 'dark',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        const { error: profileError } = await supabase.from('profiles').insert(newProfile);
+        if (profileError) {
+          console.warn('[Auth] [register] Erro ao criar profile:', profileError.message);
         } else {
-          // ✉️ FLUXO E-MAIL/SENHA TRADICIONAL:
-          // NÃO seta os estados locais. Força o usuário a ir ao e-mail confirmar.
-          console.log('[Auth] [register] ⏳ Cadastro com e-mail pendente. Aguardando confirmação.');
-          return { 
-            success: true, 
-            isOAuth: false,
-            message: 'Conta criada! Enviamos um link de confirmação para o seu e-mail. Por favor, verifique sua caixa de entrada ou spam antes de fazer o primeiro login.' 
-          };
+          console.log('[Auth] [register] ✅ Profile criado');
         }
+
+        const user: User = {
+          id: signUpData.user.id,
+          email,
+          name,
+          avatar: '',
+          role: isAdminUser ? 'admin' : 'user',
+          createdAt: new Date(signUpData.user.created_at || Date.now()),
+        };
+        setCurrentUser(user);
+        saveAuth(user);
+        setProfile({
+          id: signUpData.user.id, email, name, avatar: '',
+          role: isAdminUser ? 'admin' : 'user', theme: 'dark',
+        });
+        console.log('[Auth] [register] ✅ Cadastro concluído');
+        return { success: true, message: 'Conta criada! Verifique seu e-mail para confirmar a conta antes de fazer login.' };
       }
 
       return { success: false, message: 'Erro ao processar cadastro. Tente novamente.' };
@@ -334,9 +335,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, message: error?.message || 'Erro ao criar conta.' };
     }
   }, []);
-  
-  // DELETE ACCOUNT
-    // DELETE ACCOUNT — via RPC que deleta auth.users + profiles no PostgreSQL
+
+  // DELETE ACCOUNT — via RPC que deleta auth.users + profiles no PostgreSQL
   const deleteAccount = useCallback(async (): Promise<{ success: boolean; message: string }> => {
     const userId = currentUserRef.current?.id;
     if (!userId) return { success: false, message: 'Usuário não identificado' };
@@ -370,49 +370,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-  await supabase.auth.signOut();
-  clearAuth();
-  setCurrentUser(null);
-  setProfile(null);
-  setBlockMessage(null);
-  setNeedsOnboarding(false);
-  
-  // Limpa o token armazenado pelo Supabase no localStorage
-  localStorage.removeItem('supabase.auth.token');
-  
-  // Opcional: descomente a linha abaixo se o loop de login persistir
-  // window.location.href = window.location.origin; 
-}, []);
+    await supabase.auth.signOut();
+    clearAuth();
+    setCurrentUser(null);
+    setProfile(null);
+    setBlockMessage(null);
+    setNeedsOnboarding(false);
+  }, []);
 
-  const updateProfile = useCallback(async (updates: Partial<Profile>) => {
+  const updateProfile = useCallback(async (updates: Partial<Profile> & { full_name?: string }) => {
     if (!currentUserRef.current?.id) return;
     const dbUpdates: any = { ...updates };
     if (updates.avatar !== undefined) { dbUpdates.avatar_url = updates.avatar; delete dbUpdates.avatar; }
+    if (updates.full_name !== undefined) { dbUpdates.full_name = updates.full_name; delete dbUpdates.name; }
+    if (updates.name !== undefined) { dbUpdates.full_name = updates.name; delete dbUpdates.name; }
+    console.log('[Auth] [updateProfile] dbUpdates:', dbUpdates);
     const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', currentUserRef.current.id);
-    if (error) throw error;
-    setProfile(prev => prev ? { ...prev, ...updates } : null);
-    if (updates.name || updates.avatar) {
-      setCurrentUser(prev => prev ? { ...prev, name: updates.name || prev.name, avatar: updates.avatar || prev.avatar } : null);
+    if (error) { console.error('[Auth] [updateProfile] Erro:', error.message); throw error; }
+    console.log('[Auth] [updateProfile] ✅ Sucesso');
+    setProfile(prev => prev ? { ...prev, ...updates, name: updates.full_name || updates.name || prev?.name } : null);
+    if (updates.name || updates.full_name || updates.avatar) {
+      setCurrentUser(prev => prev ? { ...prev, name: (updates.full_name || updates.name || prev.name), avatar: updates.avatar || prev.avatar } : null);
     }
   }, []);
 
   const loginWithGoogle = useCallback(async () => {
-  // Limpa qualquer bloqueio anterior antes de tentar logar
-  sessionStorage.removeItem('bloqueio_reativacao_ativo');
-  
-  const { data, error } = await supabase.auth.signInWithOAuth({ 
-    provider: 'google', 
-    options: { redirectTo: `${window.location.origin}?reactive=true` } 
-  });
-  
-  if (error) return { success: false, message: error.message };
-  if (data.url) window.location.href = data.url;
-}, []);
+    const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
+    if (error) return { success: false, message: error.message };
+    if (data.url) window.location.href = data.url;
+    return { success: true, message: 'Redirecionando...' };
+  }, []);
 
   const resetPassword = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/?reset_password=true` });
     if (error) return { success: false, message: error.message };
-    return { success: true, message: 'Link de redefinicao enviado!' };
+    return { success: true, message: 'Link de redefinição enviado!' };
   }, []);
 
   const dismissOnboarding = useCallback(() => {
@@ -435,7 +427,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return { success: false, message: error.message };
 
-    // Se profile nao existe (conta deletada em recovery), reativar via upsert
+    // Se profile não existe (conta deletada em recovery), reativar via upsert
     if (recoveryEmail) {
       const { data: profileCheck } = await supabase.from('profiles').select('id').eq('email', recoveryEmail).maybeSingle();
       if (!profileCheck) {
@@ -532,7 +524,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.warn('[Auth] Falha no auto-provisionamento');
           }
 
-          console.log('[Auth] Profile nao existe (conta deletada):', session.user.email);
+          console.log('[Auth] Profile não existe (conta deletada):', session.user.email);
           await supabase.auth.signOut();
           clearAuth();
           setCurrentUser(null);
@@ -596,8 +588,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     init();
   }, [fetchProfile, autoProvisionProfile, isGoogleProvider]);
-
-  // ============================================================
+    // ============================================================
   // onAuthStateChange
   // ============================================================
   useEffect(() => {
@@ -607,7 +598,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'PASSWORD_RECOVERY') {
         console.log('[Auth] [onAuthStateChange] 🔒 PASSWORD_RECOVERY — flag ativada');
         return;
-n      }
+      }
 
       if (event === 'SIGNED_IN' && session?.user) {
         // Se estamos em sessao de recovery (apos clicar no link do e-mail),
@@ -631,14 +622,27 @@ n      }
               if (provisioned) {
                 setNeedsOnboarding(true);
               }
+              // Limpar URL de tokens OAuth após provisionamento
+              if (window.location.hash.includes('access_token=') || window.location.search.includes('reactive=')) {
+                console.log('[Auth] [SIGNED_IN] Limpando URL de tokens OAuth (provisionamento)...');
+                window.history.replaceState(null, '', window.location.pathname);
+              }
               setIsLoading(false);
               return;
             }
-            console.log('[Auth] [SIGNED_IN] Profile nao encontrado:', session.user!.email);
+            console.log('[Auth] [SIGNED_IN] Profile não encontrado:', session.user!.email);
             return;
           }
 
           console.log('[Auth] [SIGNED_IN] Profile OK:', session.user!.email);
+
+          // Limpar URL de tokens OAuth após login bem-sucedido
+          if (window.location.hash.includes('access_token=') || window.location.search.includes('reactive=')) {
+            console.log('[Auth] [SIGNED_IN] Limpando URL de tokens OAuth...');
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState(null, '', cleanUrl);
+          }
+
           const email = session.user!.email || '';
           const user: User = {
             id: session.user!.id,
