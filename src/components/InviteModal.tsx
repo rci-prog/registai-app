@@ -12,20 +12,6 @@ import { Mail, Send, Loader2, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
-/**
- * InviteModal — Sistema de Convites
- *
- * Abre ao clicar em "Convidar Amigo" no Header.
- * Chama a Edge Function send-invite do Supabase que:
- *  - Valida o e-mail
- *  - Aplica rate limit (5 convites/hora)
- *  - Gera token unico
- *  - Salva no banco para rastreamento
- *
- * O envio real de e-mail depende do SMTP/Resend configurado
- * na Edge Function (em breve).
- */
-
 interface InviteModalProps {
   open: boolean;
   onClose: () => void;
@@ -43,13 +29,12 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
   };
 
   const handleSendInvite = async () => {
-    // Validacao
     if (!email.trim()) {
-      setError('Digite um e-mail valido.');
+      setError('Digite um e-mail válido.');
       return;
     }
     if (!validateEmail(email)) {
-      setError('E-mail invalido.');
+      setError('E-mail inválido.');
       return;
     }
 
@@ -57,39 +42,35 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
     setError(null);
 
     try {
-      // Insert direto na tabela invites (sem Edge Function)
       const inviteToken = crypto.randomUUID();
       const finalInviteUrl = `https://www.registai.com.br?ref=${inviteToken}`;
 
-      const { data, error } = await supabase.from('invites').insert({
-        sender_id: currentUser?.id,
-        sender_email: currentUser?.email,
-        recipient_email: email.trim(),
-        token: inviteToken,
-        invite_url: finalInviteUrl,
-        status: 'pending',
-      }).select();
+      // Ajustado para os nomes das colunas reais da sua tabela: 
+      // id, sender_id, sender_email, recipient_email, token, invite_url, status, created_at
+      const { error: insertError } = await supabase.from('invites').insert([
+        {
+          sender_id: currentUser?.id,
+          sender_email: currentUser?.email,
+          recipient_email: email.trim(),
+          token: inviteToken,
+          invite_url: finalInviteUrl,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        }
+      ]);
 
-      if (error) {
-        console.error('[Invite] INSERT ERROR:', error.code, error.message);
-        throw new Error(`[${error.code}] ${error.message}`);
+      if (insertError) {
+        console.error('[Invite] INSERT ERROR:', insertError);
+        throw new Error(insertError.message);
       }
 
-      console.log('[Invite] Convite salvo:', data);
       setSent(true);
     } catch (err: any) {
       console.error('[Invite] Erro:', err);
-      const msg = err.message || '';
-      if (msg.includes('23503')) {
-        setError('Erro de referencia: usuario nao encontrado.');
-      } else if (msg.includes('23505')) {
-        setError('Convite ja enviado para este e-mail.');
-      } else if (msg.includes('42501')) {
-        setError('Sem permissao para enviar convites.');
-      } else if (msg.includes('42703')) {
-        setError('Coluna nao encontrada. Verifique a tabela invites.');
+      if (err.message?.includes('42501')) {
+        setError('Sem permissão para enviar convites.');
       } else {
-        setError(msg || 'Erro ao enviar convite. Tente novamente.');
+        setError('Erro ao enviar convite. Tente novamente mais tarde.');
       }
     } finally {
       setSending(false);
@@ -112,19 +93,15 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
             Convidar Amigo
           </DialogTitle>
           <DialogDescription className="text-slate-400">
-            Indique o RegistAI para um amigo. Ele recebera um convite por e-mail.
+            Indique o RegistAI para um amigo.
           </DialogDescription>
         </DialogHeader>
 
         {sent ? (
-          /* Estado de sucesso */
           <div className="flex flex-col items-center gap-4 py-6">
             <CheckCircle2 className="w-16 h-16 text-emerald-400" />
             <p className="text-center text-emerald-400 font-medium text-lg">
               Convite enviado com sucesso!
-            </p>
-            <p className="text-center text-sm text-slate-400">
-              Assim que seu amigo se cadastrar, voces poderao compartilhar ferramentas.
             </p>
             <Button
               onClick={handleClose}
@@ -134,7 +111,6 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
             </Button>
           </div>
         ) : (
-          /* Formulario de envio */
           <div className="flex flex-col gap-4 py-2">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-300">
@@ -145,13 +121,12 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
                 placeholder="amigo@email.com"
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setError(null); }}
-                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 focus:border-violet-500 focus:ring-violet-500/20"
+                className="bg-slate-800 border-slate-600 text-white focus:border-violet-500"
                 onKeyDown={(e) => e.key === 'Enter' && handleSendInvite()}
                 disabled={sending}
+                autoComplete="off"
               />
-              {error && (
-                <p className="text-sm text-red-400">{error}</p>
-              )}
+              {error && <p className="text-sm text-red-400">{error}</p>}
             </div>
 
             <Button
@@ -169,13 +144,8 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
                   <Send className="w-4 h-4 mr-2" />
                   Enviar Convite
                 </>
-              )
-              }
+              )}
             </Button>
-
-            <p className="text-xs text-slate-600 text-center">
-              Limite de 5 convites por hora.
-            </p>
           </div>
         )}
       </DialogContent>
