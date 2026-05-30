@@ -11,7 +11,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
   global: {
     headers: {
-      'X-Client-Info': 'registAI@www.registai.com.br',
+      'X-Client-Info': 'RegistAI@www.registai.com.br',
     },
   },
 });
