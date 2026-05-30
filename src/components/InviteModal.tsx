@@ -10,7 +10,18 @@ import {
 } from '@/components/ui/dialog';
 import { Mail, Send, Loader2, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+
+const SUPABASE_URL = 'https://cmfgirvgnexkcomhcosm.supabase.co';
+const AUTH_KEY = 'sb-cmfgirvgnexkcomhcosm-auth-token';
+
+function getUserToken(): string | null {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.access_token || null;
+  } catch { return null; }
+}
 
 interface InviteModalProps {
   open: boolean;
@@ -42,20 +53,33 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
     setError(null);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('send-invite', {
-        body: {
+      // Chamada direta a Edge Function (mais confiavel que supabase.functions.invoke)
+      const userToken = getUserToken();
+      if (!userToken) {
+        setError('Voce precisa estar logado para enviar convites.');
+        setSending(false);
+        return;
+      }
+
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/send-invite`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${userToken}`,
+          'Content-Type': 'application/json',
+          'apikey': 'sb_publishable_Dm-ozWvAve1nkgjEDg_QsA_-gldlMxk',
+        },
+        body: JSON.stringify({
           sender_id: currentUser?.id,
           sender_email: currentUser?.email,
           recipient_email: email.trim(),
-        },
+        }),
       });
 
-      if (fnError) {
-        throw new Error(fnError.message || 'Erro ao enviar convite.');
-      }
+      const data = await resp.json();
+      console.log('[Invite] Response status:', resp.status, 'data:', data);
 
-      if (data?.error) {
-        throw new Error(data.error);
+      if (!resp.ok) {
+        throw new Error(data.error || `Erro ${resp.status}`);
       }
 
       console.log('[Invite] Convite enviado:', data);
@@ -63,16 +87,16 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
     } catch (err: any) {
       console.error('[Invite] Erro:', err);
       const msg = err.message || '';
-      if (msg.includes('Rate limit') || msg.includes('max 5 invites')) {
+      if (msg.includes('Rate limit') || msg.includes('429')) {
         setError('Limite de convites atingido. Tente novamente em 1 hora.');
-      } else if (msg.includes('already has an account') || msg.includes('Recipient already')) {
+      } else if (msg.includes('already has') || msg.includes('409')) {
         setError('Este e-mail ja possui uma conta no RegistAI.');
-      } else if (msg.includes('Invalid recipient')) {
+      } else if (msg.includes('Invalid recipient') || msg.includes('400')) {
         setError('E-mail do destinatario invalido.');
-      } else if (msg.includes('Unauthorized')) {
-        setError('Voce precisa estar logado para enviar convites.');
+      } else if (msg.includes('Unauthorized') || msg.includes('401') || msg.includes('403')) {
+        setError('Sessao expirada. Faca login novamente.');
       } else {
-        setError(err.message || 'Erro ao enviar convite. Tente novamente.');
+        setError('Erro ao enviar convite. Tente novamente.');
       }
     } finally {
       setSending(false);
