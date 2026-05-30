@@ -60,7 +60,7 @@ export function RegisChat({ tools, theme, userEmail }: RegisChatProps) {
       setMessages([
         {
           role: 'model',
-          text: `Ola! Sou o **Regis**, seu assistente de IA especializado.\n\nEstou aqui para ajudar voce a:\n- Escolher as melhores ferramentas de IA\n- Tirar duvidas tecnicas\n- Sugerir fluxos de trabalho\n- Aproveitar ao maximo o seu registAI\n\nComo posso ajudar hoje?`,
+          text: `Ola! Sou o **Regis**, seu assistente de IA especializado.\n\nEstou aqui para ajudar voce a:\n- Escolher as melhores ferramentas de IA\n- Tirar duvidas tecnicas\n- Sugerir fluxos de trabalho\n- Aproveitar ao maximo o seu RegistAI\n\nComo posso ajudar hoje?`,
           timestamp: Date.now(),
         },
       ]);
