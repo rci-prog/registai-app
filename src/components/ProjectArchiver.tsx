@@ -78,8 +78,8 @@ const typeIcons: Record<string, any> = {
 
 const typeLabels: Record<string, string> = {
   image: 'Imagem',
-  video: 'Video',
-  audio: 'Audio',
+  video: 'Vídeo',
+  audio: 'Áudio',
   document: 'Documento',
   url: 'URL',
 };
@@ -362,7 +362,7 @@ export function ProjectArchiver({ projects, tools, theme, onAdd, onDelete }: Pro
           </div>
         )}
 
-        {/* Botão Publique seu Projeto */}
+        {/* Botao Publique seu Projeto */}
         <button
           onClick={() => setPublishOpen(true)}
           className={`w-full mt-3 py-2.5 px-4 rounded-xl text-xs font-semibold tracking-wide transition-all hover:scale-[1.02] active:scale-[0.98] ${
@@ -414,8 +414,8 @@ export function ProjectArchiver({ projects, tools, theme, onAdd, onDelete }: Pro
                   </SelectTrigger>
                   <SelectContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700' : ''}>
                     <SelectItem value="image">Imagem</SelectItem>
-                    <SelectItem value="video">Video</SelectItem>
-                    <SelectItem value="audio">Audio</SelectItem>
+                    <SelectItem value="video">Vídeo</SelectItem>
+                    <SelectItem value="audio">Áudio</SelectItem>
                     <SelectItem value="document">Documento</SelectItem>
                     <SelectItem value="url">URL</SelectItem>
                   </SelectContent>
@@ -610,7 +610,7 @@ export function ProjectArchiver({ projects, tools, theme, onAdd, onDelete }: Pro
               Remover projeto?
             </AlertDialogTitle>
             <AlertDialogDescription className={theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}>
-              Este projeto sera removido do arquivo.
+              Este projeto será removido do arquivo.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -707,7 +707,7 @@ export function ProjectArchiver({ projects, tools, theme, onAdd, onDelete }: Pro
                 if (shareProject && shareEmail) {
                   const subject = encodeURIComponent(`Projeto compartilhado: ${shareProject.name}`);
                   const body = encodeURIComponent(
-                    `Ola!\n\nEstou compartilhando este projeto com voce:\n\nNome: ${shareProject.name}\nTipo: ${shareProject.type.toUpperCase()}\n${shareProject.external_url ? `URL: ${shareProject.external_url}\n` : ''}${shareProject.file_url ? `Arquivo: ${shareProject.file_url}\n` : ''}\n\n---\nEnviado via registAI`
+                    `Olá!\n\nEstou compartilhando este projeto com você:\n\nNome: ${shareProject.name}\nTipo: ${shareProject.type.toUpperCase()}\n${shareProject.external_url ? `URL: ${shareProject.external_url}\n` : ''}${shareProject.file_url ? `Arquivo: ${shareProject.file_url}\n` : ''}\n\n---\nEnviado via registAI`
                   );
                   window.open(`mailto:${shareEmail}?subject=${subject}&body=${body}`, '_blank');
                   setShareProject(null);
