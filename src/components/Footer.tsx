@@ -12,7 +12,7 @@ export function Footer() {
         <div className="max-w-7xl mx-auto px-4 py-5">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="text-xs text-slate-500 text-center sm:text-left">
-              &copy; {CURRENT_YEAR} registAI. Todos os direitos reservados.
+              &copy; {CURRENT_YEAR} RegistAI. Todos os direitos reservados.
             </p>
             <div className="flex items-center gap-1 text-xs">
               <button
