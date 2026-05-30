@@ -78,7 +78,9 @@ export function PublishRequestModal({ open, onClose, userEmail = '' }: PublishRe
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setError('');
+    if (isSubmitting) return;
 
     if (!projectUrl.trim()) {
       setError('Informe a URL do projeto.');
