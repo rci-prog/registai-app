@@ -643,7 +643,7 @@ export function ProjectArchiver({ projects, tools, theme, onAdd, onDelete }: Pro
           <div className="space-y-3 py-2">
             <div>
               <label className={`text-xs mb-1 block ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>
-                E-mail do destinatário
+                "E-mail do destinatário"
               </label>
               <input
                 type="email"
