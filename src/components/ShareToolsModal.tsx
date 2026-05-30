@@ -129,7 +129,7 @@ export function ShareToolsModal({ isOpen, onClose, theme, currentUser, tools }: 
           {/* Email do Destinatario */}
           <div>
             <label className={`text-xs font-medium mb-1 block ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-              E-mail do Destinatario
+              "E-mail do Destinatário"
             </label>
             <div className="relative">
               <User className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
