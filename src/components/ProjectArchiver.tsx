@@ -707,7 +707,7 @@ export function ProjectArchiver({ projects, tools, theme, onAdd, onDelete }: Pro
                 if (shareProject && shareEmail) {
                   const subject = encodeURIComponent(`Projeto compartilhado: ${shareProject.name}`);
                   const body = encodeURIComponent(
-                    `Olá!\n\nEstou compartilhando este projeto com você:\n\nNome: ${shareProject.name}\nTipo: ${shareProject.type.toUpperCase()}\n${shareProject.external_url ? `URL: ${shareProject.external_url}\n` : ''}${shareProject.file_url ? `Arquivo: ${shareProject.file_url}\n` : ''}\n\n---\nEnviado via registAI`
+                    `Olá!\n\nEstou compartilhando este projeto com você:\n\nNome: ${shareProject.name}\nTipo: ${shareProject.type.toUpperCase()}\n${shareProject.external_url ? `URL: ${shareProject.external_url}\n` : ''}${shareProject.file_url ? `Arquivo: ${shareProject.file_url}\n` : ''}\n\n---\nEnviado via RegistAI`
                   );
                   window.open(`mailto:${shareEmail}?subject=${subject}&body=${body}`, '_blank');
                   setShareProject(null);
