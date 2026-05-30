@@ -12,6 +12,17 @@ import { Mail, Send, Loader2, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
+const SUPABASE_URL = 'https://cmfgirvgnexkcomhcosm.supabase.co';
+
+function getUserToken(): string | null {
+  try {
+    const raw = localStorage.getItem('sb-cmfgirvgnexkcomhcosm-auth-token');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.access_token || null;
+  } catch { return null; }
+}
+
 interface InviteModalProps {
   open: boolean;
   onClose: () => void;
@@ -42,6 +53,7 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
     setError(null);
 
     try {
+      // PASSO 1: Salvar convite na tabela (insert direto, sem Edge Function)
       const inviteToken = crypto.randomUUID();
       const finalInviteUrl = `https://www.registai.com.br?ref=${inviteToken}`;
 
@@ -59,7 +71,37 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
         throw new Error(`[${error.code}] ${error.message}`);
       }
 
-      console.log('[Invite] Convite salvo:', data);
+      console.log('[Invite] Convite salvo na tabela:', data);
+
+      // PASSO 2: Enviar e-mail via Edge Function (NAO acessa banco -> sem erro 42501)
+      const userToken = getUserToken();
+      if (userToken) {
+        const senderName = currentUser?.email?.split('@')[0] || 'Alguem';
+        fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${userToken}`,
+            'Content-Type': 'application/json',
+            'apikey': 'sb_publishable_Dm-ozWvAve1nkgjEDg_QsA_-gldlMxk',
+          },
+          body: JSON.stringify({
+            sender_name: senderName,
+            recipient_email: email.trim(),
+            invite_url: finalInviteUrl,
+          }),
+        }).then(async (resp) => {
+          const result = await resp.json();
+          console.log('[Invite] E-mail response:', resp.status, result);
+          if (!resp.ok) {
+            console.warn('[Invite] E-mail nao enviado (Resend nao configurado?):', result.error);
+          } else {
+            console.log('[Invite] E-mail enviado com sucesso!');
+          }
+        }).catch((err) => {
+          console.warn('[Invite] Erro ao chamar send-email (Resend nao configurado?):', err.message);
+        });
+      }
+
       setSent(true);
     } catch (err: any) {
       console.error('[Invite] Erro:', err);
@@ -105,14 +147,19 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
             <p className="text-center text-sm text-slate-400">
               Assim que seu amigo se cadastrar, voces poderao compartilhar ferramentas.
             </p>
-            <Button onClick={handleClose} className="mt-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white">
+            <Button
+              onClick={handleClose}
+              className="mt-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white"
+            >
               Fechar
             </Button>
           </div>
         ) : (
           <div className="flex flex-col gap-4 py-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">E-mail do convidado</label>
+              <label className="text-sm font-medium text-slate-300">
+                E-mail do convidado
+              </label>
               <Input
                 type="email"
                 placeholder="amigo@email.com"
@@ -122,16 +169,32 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
                 onKeyDown={(e) => e.key === 'Enter' && handleSendInvite()}
                 disabled={sending}
               />
-              {error && <p className="text-sm text-red-400">{error}</p>}
+              {error && (
+                <p className="text-sm text-red-400">{error}</p>
+              )}
             </div>
+
             <Button
               onClick={handleSendInvite}
               disabled={sending || !email.trim()}
               className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white disabled:opacity-50"
             >
-              {sending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</> : <><Send className="w-4 h-4 mr-2" />Enviar Convite</>}
+              {sending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Enviar Convite
+                </>
+              )}
             </Button>
-            <p className="text-xs text-slate-600 text-center">Limite de 5 convites por hora.</p>
+
+            <p className="text-xs text-slate-600 text-center">
+              Limite de 5 convites por hora.
+            </p>
           </div>
         )}
       </DialogContent>
