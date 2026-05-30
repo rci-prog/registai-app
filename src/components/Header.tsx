@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import type { AppNotification } from '@/hooks/useNotifications';
 import { NotificationDetailModal } from '@/components/NotificationDetailModal';
+import { InviteModal } from '@/components/InviteModal';
 
 interface HeaderProps {
   onLogin: () => void;
@@ -24,6 +25,7 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [detailNotif, setDetailNotif] = useState<AppNotification | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearAllNotifications } = useNotifications(currentUser?.email);
 
   // Avatar URL: ignorar URLs do Supabase Storage (bloqueadas por AdBlock)
@@ -108,6 +110,7 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
               <Button
                 size="sm"
                 variant="ghost"
+                onClick={() => setInviteOpen(true)}
                 className="hidden sm:flex items-center gap-1.5 text-slate-300 hover:text-white"
               >
                 <UserPlus className="w-4 h-4" />
@@ -225,6 +228,11 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
         notification={detailNotif}
         theme={theme}
       />
+
+      {/* Invite Modal — abre ao clicar em "Convidar" */}
+      {currentUser && (
+        <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
+      )}
     </header>
   );
 }
