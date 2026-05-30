@@ -40,7 +40,7 @@ class ErrorBoundary extends Component<EBProps, EBState> {
           fontFamily: 'system-ui, sans-serif', padding: '2rem',
         }}>
           <div style={{ textAlign: 'center', maxWidth: '500px' }}>
-            <h1 style={{ color: '#8b5cf6', marginBottom: '1rem' }}>registAI</h1>
+            <h1 style={{ color: '#8b5cf6', marginBottom: '1rem' }}>RegistAI</h1>
             <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Algo deu errado</h2>
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
               Houve um erro ao iniciar a aplicação. Tente recarregar a página.
