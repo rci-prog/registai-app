@@ -73,11 +73,11 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
 
       console.log('[Invite] Convite salvo na tabela:', data);
 
-      // PASSO 2: Enviar e-mail via Edge Function (NAO acessa banco -> sem erro 42501)
+      // PASSO 2: Enviar e-mail via Edge Function send-invite (ja existe, Resend configurado)
       const userToken = getUserToken();
       if (userToken) {
         const senderName = currentUser?.email?.split('@')[0] || 'Alguem';
-        fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+        fetch(`${SUPABASE_URL}/functions/v1/send-invite`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${userToken}`,
@@ -93,12 +93,12 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
           const result = await resp.json();
           console.log('[Invite] E-mail response:', resp.status, result);
           if (!resp.ok) {
-            console.warn('[Invite] E-mail nao enviado (Resend nao configurado?):', result.error);
+            console.warn('[Invite] E-mail nao enviado:', result.error);
           } else {
             console.log('[Invite] E-mail enviado com sucesso!');
           }
         }).catch((err) => {
-          console.warn('[Invite] Erro ao chamar send-email (Resend nao configurado?):', err.message);
+          console.warn('[Invite] Erro ao chamar send-invite:', err.message);
         });
       }
 
