@@ -100,7 +100,7 @@ export function AnalyticsSidebar({ tools, clickData, theme, onReset }: Analytics
                   className="w-full text-[11px] h-7 text-red-400 hover:bg-red-500/10 hover:text-red-300"
                 >
                   <Trash2 className="w-3 h-3 mr-1" />
-                  Limpar Historico
+                  Limpar Histórico
                 </Button>
               </div>
             )}
@@ -113,7 +113,7 @@ export function AnalyticsSidebar({ tools, clickData, theme, onReset }: Analytics
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-white">
               <AlertTriangle className="w-5 h-5 text-red-500" />
-              Limpar Historico?
+              Limpar Histórico?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-slate-400">
               Tem certeza que deseja zerar todos os registros de acesso? Esta acao nao pode ser desfeita.
