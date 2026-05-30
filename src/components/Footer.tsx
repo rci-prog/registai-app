@@ -26,7 +26,7 @@ export function Footer() {
                 onClick={() => { /* placeholder */ }}
                 className="text-slate-400 hover:text-violet-400 transition-colors px-2 py-1"
               >
-                Termos de Servico
+                Termos de Serviço
               </button>
               <span className="text-slate-700">|</span>
               <button
