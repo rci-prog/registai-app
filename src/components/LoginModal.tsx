@@ -250,7 +250,7 @@ export function LoginModal({ open, onClose, initialError }: LoginModalProps) {
             </svg>
           </div>
           <DialogTitle className="text-2xl font-bold text-white">
-            {showForgotPassword ? 'Recuperar Senha' : 'Acesso ao seu Catalogo'}
+            {showForgotPassword ? 'Recuperar Senha' : 'Acesso ao seu Catálogo'}
           </DialogTitle>
           <DialogDescription className="text-slate-400">
             {showForgotPassword 
