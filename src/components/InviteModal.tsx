@@ -105,19 +105,14 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
             <p className="text-center text-sm text-slate-400">
               Assim que seu amigo se cadastrar, voces poderao compartilhar ferramentas.
             </p>
-            <Button
-              onClick={handleClose}
-              className="mt-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white"
-            >
+            <Button onClick={handleClose} className="mt-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white">
               Fechar
             </Button>
           </div>
         ) : (
           <div className="flex flex-col gap-4 py-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">
-                E-mail do convidado
-              </label>
+              <label className="text-sm font-medium text-slate-300">E-mail do convidado</label>
               <Input
                 type="email"
                 placeholder="amigo@email.com"
@@ -127,33 +122,16 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
                 onKeyDown={(e) => e.key === 'Enter' && handleSendInvite()}
                 disabled={sending}
               />
-              {error && (
-                <p className="text-sm text-red-400">{error}</p>
-              )}
+              {error && <p className="text-sm text-red-400">{error}</p>}
             </div>
-
             <Button
               onClick={handleSendInvite}
               disabled={sending || !email.trim()}
               className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white disabled:opacity-50"
             >
-              {sending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Enviando...
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4 mr-2" />
-                  Enviar Convite
-                </>
-              )
-              }
+              {sending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</> : <><Send className="w-4 h-4 mr-2" />Enviar Convite</>}
             </Button>
-
-            <p className="text-xs text-slate-600 text-center">
-              Limite de 5 convites por hora.
-            </p>
+            <p className="text-xs text-slate-600 text-center">Limite de 5 convites por hora.</p>
           </div>
         )}
       </DialogContent>
