@@ -72,7 +72,7 @@ export function Header({ onLogin, onProfile, onAdmin }: HeaderProps) {
           
           <div>
             <h1 className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-              registAI
+              RegistAI
             </h1>
             <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Catálogo Inteligente de IA</p>
           </div>
