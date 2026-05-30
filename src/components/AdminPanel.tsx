@@ -1384,29 +1384,29 @@ function GeneralNotificationModal({ open, onClose, theme }: GeneralNotificationM
 
   const handleSend = async () => {
     if (!title.trim()) {
-      setStatus('Digite um titulo para a notificacao.');
+      setStatus('Digite um título para a notificação.');
       setStatusType('error');
       return;
     }
     if (!message.trim()) {
-      setStatus('Digite a mensagem da notificacao.');
+      setStatus('Digite a mensagem da notificação.');
       setStatusType('error');
       return;
     }
 
     setIsSending(true);
-    setStatus('Buscando usuarios...');
+    setStatus('Buscando usuários...');
     setStatusType(null);
 
     const emails = await fetchAllUserEmails();
     if (emails.length === 0) {
-      setStatus('Nenhum usuario encontrado.');
+      setStatus('Nenhum usuário encontrado.');
       setStatusType('error');
       setIsSending(false);
       return;
     }
 
-    setStatus(`Enviando para ${emails.length} usuarios...`);
+    setStatus(`Enviando para ${emails.length} usuários...`);
 
     let sent = 0;
     let failed = 0;
@@ -1425,13 +1425,13 @@ function GeneralNotificationModal({ open, onClose, theme }: GeneralNotificationM
 
     setIsSending(false);
     if (sent > 0) {
-      setStatus(`✅ Notificacao enviada para ${sent} de ${emails.length} usuarios${failed > 0 ? ` (${failed} falha)` : ''}`);
+      setStatus(`✅ Notificação enviada para ${sent} de ${emails.length} usuários${failed > 0 ? ` (${failed} falha)` : ''}`);
       setStatusType('success');
       setTitle('');
       setMessage('');
       setTimeout(() => { setStatus(null); setStatusType(null); }, 5000);
     } else {
-      setStatus('❌ Falha ao enviar para todos os usuarios.');
+      setStatus('❌ Falha ao enviar para todos os usuários.');
       setStatusType('error');
     }
   };
@@ -1442,7 +1442,7 @@ function GeneralNotificationModal({ open, onClose, theme }: GeneralNotificationM
         <DialogHeader>
           <DialogTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
             <Megaphone className="w-5 h-5 text-violet-500" />
-            Notificacao Geral
+            Notificação Geral
           </DialogTitle>
         </DialogHeader>
 
@@ -1461,12 +1461,12 @@ function GeneralNotificationModal({ open, onClose, theme }: GeneralNotificationM
 
           <div>
             <Label className={`text-xs font-medium mb-1 block ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-              Titulo
+              Título
             </Label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex: Nova atualizacao disponivel"
+              placeholder="Ex: Nova atualização disponível"
               maxLength={100}
               className={`text-sm ${isDark ? 'bg-slate-900 border-slate-700 text-white' : ''}`}
             />
@@ -1482,7 +1482,7 @@ function GeneralNotificationModal({ open, onClose, theme }: GeneralNotificationM
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Digite a mensagem que sera enviada a todos os usuarios..."
+              placeholder="Digite a mensagem que será enviada a todos os usuários..."
               maxLength={300}
               rows={5}
               className={`w-full rounded-md border px-3 py-2 text-sm resize-none ${
@@ -1497,7 +1497,7 @@ function GeneralNotificationModal({ open, onClose, theme }: GeneralNotificationM
           </div>
 
           <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
-            Esta notificacao sera entregue a <strong>TODOS</strong> os usuarios cadastrados na plataforma, aparecendo no icone de sino de cada um.
+            Esta notificação será entregue a <strong>TODOS</strong> os usuários cadastrados na plataforma, aparecendo no ícone de sino de cada um.
           </p>
 
           <div className="flex justify-end gap-2 pt-2">
@@ -1527,5 +1527,6 @@ function GeneralNotificationModal({ open, onClose, theme }: GeneralNotificationM
         </div>
       </DialogContent>
     </Dialog>
+ 
   );
 }
