@@ -134,7 +134,7 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
             Convidar Amigo
           </DialogTitle>
           <DialogDescription className="text-slate-400">
-            Indique o RegistAI para um amigo. Ele recebera um convite por e-mail.
+            Indique o RegistAI para um amigo. Ele receberá um convite por e-mail.
           </DialogDescription>
         </DialogHeader>
 
@@ -145,7 +145,7 @@ export function InviteModal({ open, onClose }: InviteModalProps) {
               Convite enviado com sucesso!
             </p>
             <p className="text-center text-sm text-slate-400">
-              Assim que seu amigo se cadastrar, voces poderao compartilhar ferramentas.
+              Assim que seu amigo se cadastrar, vocês poderão compartilhar ferramentas.
             </p>
             <Button
               onClick={handleClose}
