@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Heart, ExternalLink, Edit, Trash2, Star, FileText, MoreVertical
 } from 'lucide-react';
@@ -103,6 +103,17 @@ export function ToolCard({
   const handleDelete = () => { onDelete?.(tool?.id || ''); setShowDeleteConfirm(false); };
   const handleRate = (star: number) => { onRate?.(tool?.id || '', (tool?.rating || 0) === star ? 0 : star); };
 
+  // SVG inline como fallback de favicon (evita requisicoes de rede bloqueadas por AdBlock)
+  const FALLBACK_ICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='8' fill='%23334155'/%3E%3Ctext x='24' y='30' font-size='20' font-weight='bold' text-anchor='middle' fill='%2394a3b8'%3EAI%3C/text%3E%3C/svg%3E";
+
+  // Handler seguro para erro de imagem (evita loop infinito)
+  const handleImgError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.src !== FALLBACK_ICON) {
+      img.src = FALLBACK_ICON;
+    }
+  }, []);
+
   const getCategoryColor = (category: string) => {
     if (!category) return theme === 'dark' ? 'bg-slate-800 text-slate-400' : 'bg-gray-100 text-gray-600';
     const colors: Record<string, string> = {
@@ -126,9 +137,12 @@ export function ToolCard({
         <div className="p-4">
           <div className="flex items-start gap-3">
             <div className="relative flex-shrink-0">
-              <img src={tool?.image_url || `https://www.google.com/s2/favicons?domain=${tool?.url}&sz=128`}
-                alt={tool?.name} className="w-12 h-12 rounded-lg object-contain bg-slate-800/50 p-0.5"
-                onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/48?text=AI'; }} />
+              <img
+                src={tool?.image_url || `https://www.google.com/s2/favicons?domain=${tool?.url}&sz=128`}
+                alt={tool?.name}
+                className="w-12 h-12 rounded-lg object-contain bg-slate-800/50 p-0.5"
+                onError={handleImgError}
+              />
               {tool?.isFavorite && (
                 <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
                   <Heart className="w-3 h-3 text-white fill-current" />
@@ -255,7 +269,7 @@ export function ToolCard({
         <AlertDialogContent className={theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : ''}>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-            <AlertDialogDescription>Tem certeza que deseja excluir {tool?.name}?</AlertDialogDescription>
+            <AlertDialogDescription>Tem certeza que deseja excluir {tool?.name}? Esta ação não pode ser desfeita.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
