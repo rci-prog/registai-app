@@ -116,7 +116,7 @@ export function AnalyticsSidebar({ tools, clickData, theme, onReset }: Analytics
               Limpar Histórico?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-slate-400">
-              Tem certeza que deseja zerar todos os registros de acesso? Esta acao nao pode ser desfeita.
+              Tem certeza que deseja zerar todos os registros de acesso? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
